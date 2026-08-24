@@ -1,12 +1,12 @@
-# Locked future Projects and career-outreach architecture
+# Locked Project context and future career-outreach architecture
 
-> Status: authoritative product roadmap only. Projects and the career-outreach workflow are not implemented in Gate 2.
+> Status: Gate 3 implements the Project context foundation. Job Search, Career Intelligence, contacts, resumes, AI, scheduling, and the remaining career-outreach workflow are authoritative future roadmap only.
 
 KYM Mail is not merely an email client and will not become a generic job board. Its approved future product sequence is:
 
 > Find the opportunity → understand the opportunity → determine how the owner matches → present the owner appropriately → identify the right decision maker → determine how to reach that person → prepare individualized outreach → send → track the relationship.
 
-Gate 2 Mail Core remains the active implementation scope. After Mail Core achieves PASS, Projects must be evaluated as the next implementation gate before Job Search and Career Intelligence. Documentation here does not authorize Project schema, routes, screens, sample records, job-provider integrations, or AI features during Gate 2.
+Gate 3 implements only the contextual operating layer described below: persistent Projects, typed parameters, lifecycle controls, default sender relationship, shared Compose context, mail/thread association, deterministic Activity, and real dashboard surfaces. It does not authorize job-provider integrations, career intelligence, contact discovery, resumes, AI, scheduling, or fabricated workflow data.
 
 ## Projects are the contextual operating layer
 
@@ -30,13 +30,13 @@ PROJECT
 
 ### Global use remains first-class
 
-Projects are optional organizational and contextual containers. Without creating or selecting one, the owner can still read the unified Inbox, open threads, compose ordinary email, search jobs, and access Contacts. Global Job Search may later offer **Save to Project**, and shared Compose may later include an optional `Project: [None]` selection. The application must never force a Project merely to use its global tools.
+Projects are optional organizational and contextual containers. Without creating or selecting one, the owner can still read the unified Inbox, open threads, and compose ordinary email. Shared Compose implements an optional `Project: [None]` selection. Global Job Search and Contacts remain future capabilities; when implemented, they must also remain globally usable and may offer **Save to Project**. The application must never force a Project merely to use its global tools.
 
 Intentional outreach can carry Project context so KYM Mail knows why a contact, opportunity, resume, draft, sent message, or response belongs together. This context augments shared records; it does not replace or duplicate them.
 
 ### Project creation, types, and lifecycle
 
-The future Create Project flow begins with **What are you working on?** Initial types are:
+The Gate 3 Create Project flow begins with **What are you working on?** Implemented types are:
 
 - Job Search
 - Business Outreach
@@ -44,11 +44,11 @@ The future Create Project flow begins with **What are you working on?** Initial 
 - Networking
 - Custom
 
-Use one authoritative Project concept with typed and validated parameters. Do not create separate Project tables or service architectures for each type unless a proven workflow later requires it. Conversely, do not hide all behavior inside a giant untyped JSON object. The implementation gate must choose the smallest typed model that supports its approved workflows.
+Gate 3 uses one authoritative Project concept with typed and validated, version-1 parameters. It does not create separate Project tables or service architectures for each type. The type is immutable after creation, and the owner-facing lifecycle is `ACTIVE`, `PAUSED`, `COMPLETED`, and `ARCHIVED` with Archive/Restore in place of permanent deletion.
 
-Core Project information may include only what real workflows require: name, type, objective, status, useful description or notes, default sending identity, creation/update timestamps, and an archive timestamp or state. A simple deterministic lifecycle may use `ACTIVE`, `PAUSED`, `COMPLETED`, and `ARCHIVED`, but only states proven necessary during implementation are approved. Custom Projects remain simple in V1 and must not become a general-purpose workflow builder.
+Core Project information contains only what Gate 3 requires: owner, name, type, objective, status, default sending-identity relationship, versioned parameters, and creation/update timestamps. Custom Projects remain simple in V1 and are not a general-purpose workflow builder.
 
-Parameters vary by type and must not force irrelevant fields onto every Project. A Job Search Project may eventually carry target roles, keywords, location, work arrangement, minimum compensation, seniority, outreach-role priorities, a reference to the global Master Career Profile, and a default From identity. A Business Outreach Project may instead carry target organizations or industries, target contact roles, messaging style, approved material, and a default From identity. Partnership and Networking Projects may carry their corresponding organization, people, objective, talking-point, relationship, follow-up, and supporting-material context.
+Parameters vary by type and do not force irrelevant fields onto every Project. Gate 3 Job Search parameters include target roles, keywords, location text, work arrangement, optional numeric minimum compensation, seniority, and a default From identity. Business Outreach, Partnership, Networking, and Custom use their own minimal explicit schemas. Job execution, outreach, people discovery, and global career-profile relationships are not implemented.
 
 For example, a Job Search Project named **Finance Systems Leadership Search** might supply editable search context such as finance-systems or controller roles, Workday/SAP/automation/ASC 606 keywords, Dallas plus Remote, Director-level seniority, a minimum compensation filter, and `kym@kymmailapp.com` as the default sender. A Business Outreach Project may skip Job Search entirely and instead move from a selected organization to contact research, email intelligence, individualized Compose, delivery, and response tracking.
 
@@ -56,7 +56,7 @@ These examples define parameter direction only. They are not seed data, implemen
 
 ### One coherent Project workspace
 
-A future Project opens into one workspace whose relevant sections may include Overview, Jobs, Contacts, Outreach, Resume Versions, Responses, and Activity. Project type and available functionality determine which sections appear; irrelevant sections stay absent.
+An implemented Project opens into one workspace containing only operational Overview, Compose Email, Edit, status controls, and real Activity. Future Jobs, Contacts, Outreach, Resume Versions, and Responses sections stay absent until they have genuine functionality.
 
 Overview must answer what the Project is, its objective, active parameters, real work completed, and what genuinely needs attention next. It must never manufacture activity, statistics, success states, or dashboard content to make a workspace appear populated.
 
@@ -68,13 +68,13 @@ Overview must answer what the Project is, its objective, active parameters, real
 
 **Email Intelligence.** Organization-level domain, email-pattern, candidate, and verification evidence remains authoritative Contact/Organization intelligence. Projects reuse valid evidence; they do not rediscover the same corporate convention independently unless evidence has expired or must be revalidated.
 
-**Compose and sender identity.** Compose remains one shared engine. When an optional Project is selected, it may receive the default From identity, objective, selected Contact, selected JobOpportunity, approved email candidate, ResumeVersion, messaging context, and approved supporting material. A Project default such as `kym@kymmailapp.com` is a convenience rule, not a mailbox; the owner may change From when provider configuration permits it.
+**Compose and sender identity.** Compose remains one shared engine. In Gate 3 an optional Project supplies its ID and usable default From identity; the owner may change From when provider configuration permits it. If that identity becomes unavailable, the Project remains valid and Compose requires an explicit available identity instead of silently substituting one. Future Contacts, JobOpportunity, ResumeVersion, and AI messaging context are not implemented.
 
 **Resume Studio.** The Master Career Profile and Resume Studio remain global. A Project may associate a job-specific `ResumeVersion` derived from the global profile and a real JobOpportunity. It never owns a second Master Career Profile.
 
-**Outreach and responses.** Outreach may connect Project, Contact, Organization, optional JobOpportunity, Message, and optional ResumeVersion so KYM Mail retains the reason for communication. An incoming message in an already associated thread inherits that Project context through the thread; the owner should not need to reassign every response manually.
+**Outreach and responses.** Gate 3 adds nullable Project relationships to existing messages and threads. A Project-linked sent message associates its existing thread; incoming messages in that thread inherit the Project context. Future Contact, Organization, JobOpportunity, ResumeVersion, and outreach records remain unimplemented.
 
-**Activity.** Project Activity is composed only from persisted events that really occurred, such as Project creation, job save or analysis, Contact association, email verification, ResumeVersion creation, draft/save/send, permitted resume activity, incoming response, or reply. No fake activity is allowed.
+**Activity.** Gate 3 Activity is trigger-written only from persisted Project creation/update/status, message send, and reply events. Future job, contact, email-intelligence, and resume events may be added only when those real systems exist. No fake activity is allowed.
 
 ### Deterministic ownership and bounded AI
 
@@ -193,6 +193,6 @@ Deterministic logic owns provider requests, normalization, validation, deduplica
 
 AI may execute bounded requirement extraction, interpretation, evidence-backed match explanation, resume emphasis/presentation rewriting, decision-maker relevance assistance, evidence interpretation, drafting, and response classification. AI must never invent jobs, people, titles, domains, addresses, verification, or career facts; bypass state/approval rules; or autonomously send.
 
-## Gate 2 compatibility without speculative schema
+## Gate 3 foundation without speculative future schema
 
-Mail Core stores provider-stable mail-account, thread, message, history, and attachment identifiers. Future migrations can add nullable application-owned associations or normalized join tables connecting a message/thread to Contact, JobOpportunity, Project, ResumeVersion, and outreach activity without changing Gmail synchronization or making Gmail authoritative for those concepts. Provider/account identity remains attached to each mail record, while Project context remains application-owned and optional. Gate 2 intentionally creates none of those future models, associations, routes, provider integrations, or interfaces.
+Mail Core continues to store provider-stable mail-account, thread, message, history, and attachment identifiers. Gate 3 adds only nullable application-owned Project associations without changing those identifiers or making Gmail authoritative for Project state. Future migrations may add normalized associations to Contact, JobOpportunity, ResumeVersion, and outreach activity when their gates prove the use cases. Gate 3 intentionally creates none of those future models, providers, AI integrations, or interfaces.

@@ -5,6 +5,7 @@ import { log } from "@/lib/logger";
 import { blockedAttachmentPattern, validateComposeInput } from "@/lib/mail/compose-validation";
 import { loadGoogleProvider, syncGmailMessageById } from "@/lib/mail/gmail-sync";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { z } from "zod";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -20,6 +21,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const form = await request.formData();
+    const rawProjectId = form.get("projectId");
+    const projectId = typeof rawProjectId === "string" && rawProjectId ? z.string().uuid().parse(rawProjectId) : null;
     const input = validateComposeInput({
       from: form.get("from"),
       to: form.get("to"),
@@ -47,6 +50,17 @@ export async function POST(request: NextRequest) {
       .single();
     if (identityError || !identity?.mail_connection_id) throw new ValidationError("The selected sender is not available through Google Mail.");
 
+    if (projectId) {
+      const { data: project, error: projectError } = await owner.database
+        .from("projects")
+        .select("id")
+        .eq("id", projectId)
+        .eq("owner_id", owner.user.id)
+        .eq("status", "ACTIVE")
+        .maybeSingle();
+      if (projectError || !project) throw new ValidationError("Select an active Project or choose None.");
+    }
+
     const database = createSupabaseAdminClient();
     const { provider } = await loadGoogleProvider(database, identity.mail_connection_id);
     const result = await provider.send({
@@ -62,14 +76,14 @@ export async function POST(request: NextRequest) {
     });
 
     let synchronized = true;
-    try { await syncGmailMessageById(database, identity.mail_connection_id, result.messageId); }
+    try { await syncGmailMessageById(database, identity.mail_connection_id, result.messageId, projectId); }
     catch { synchronized = false; }
-    log("info", "mail.message_sent", { mailConnectionId: identity.mail_connection_id, synchronized, attachmentCount: files.length });
+    log("info", "mail.message_sent", { mailConnectionId: identity.mail_connection_id, synchronized, attachmentCount: files.length, projectAssociated: Boolean(projectId) });
     return NextResponse.json({ sent: true, synchronized, messageId: result.messageId, threadId: result.threadId }, { status: synchronized ? 200 : 202 });
   } catch (error) {
     const safeError = toSafeError(error);
     log("error", "mail.message_send_failed", { code: safeError.code });
-    return NextResponse.json({ error: safeError.safeMessage }, { status: safeError.code === "VALIDATION" ? 400 : safeError.code === "UNAUTHORIZED" ? 401 : 503 });
+    const validationFailure = error instanceof z.ZodError || safeError.code === "VALIDATION";
+    return NextResponse.json({ error: validationFailure ? "Select a valid Project and check the message details." : safeError.safeMessage }, { status: validationFailure ? 400 : safeError.code === "UNAUTHORIZED" ? 401 : 503 });
   }
 }
-

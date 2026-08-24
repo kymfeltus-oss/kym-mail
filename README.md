@@ -1,8 +1,8 @@
 # KYM Mail
 
-KYM Mail is a private, intelligent email and career-outreach application. This independent repository contains the verified Gate 1 foundation and Gate 2 Mail Core: real Supabase authentication, an owner-scoped unified mailbox, Google OAuth, Gmail synchronization, compose/send/reply, attachments, and two verified sending identities.
+KYM Mail is a private, intelligent email and career-outreach application. This independent repository contains the verified Gate 1 foundation, Gate 2 Mail Core, and Gate 3 Projects layer: real Supabase authentication, an owner-scoped unified mailbox, Google OAuth, Gmail synchronization, compose/send/reply, attachments, two verified sending identities, and persistent contextual Projects.
 
-AI, job analysis, contact discovery, resume, Projects, and outreach automation remain explicitly outside the verified Gate 2 scope.
+AI, job-provider search, career intelligence, contact discovery, resume functionality, scheduling, and outreach automation remain explicitly outside the verified Gate 3 scope.
 
 ## Canonical environments
 
@@ -25,4 +25,4 @@ Quality commands: `npm run lint`, `npm run typecheck`, `npm test`, `npm run buil
 
 During local UI development, the temporary server-only auth bypass can be enabled with `KYM_DEV_AUTH_BYPASS=true`; see `docs/security.md`. It is forcibly disabled in production and does not change database RLS.
 
-See [architecture](docs/architecture.md), [database](docs/database.md), [providers](docs/providers.md), [security](docs/security.md), [testing](docs/testing.md), [deployment](docs/deployment.md), [handover](docs/handover.md), and the explicitly unimplemented [locked future Projects and career-outreach architecture](docs/future-career-outreach-workflow.md).
+See [architecture](docs/architecture.md), [database](docs/database.md), [providers](docs/providers.md), [security](docs/security.md), [testing](docs/testing.md), [deployment](docs/deployment.md), [handover](docs/handover.md), and the [locked future career-outreach architecture](docs/future-career-outreach-workflow.md). That roadmap distinguishes the implemented Gate 3 Project context from later unimplemented workflows.

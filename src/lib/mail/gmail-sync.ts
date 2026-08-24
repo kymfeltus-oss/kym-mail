@@ -62,14 +62,19 @@ async function fetchMessages(provider: GoogleMailProvider, messageIds: string[])
   return { messages, skipped };
 }
 
-async function persistMessage(database: SupabaseClient, connectionId: string, ownerId: string, identity: MailIdentity, message: NormalizedGmailMessage) {
+async function persistMessage(database: SupabaseClient, connectionId: string, ownerId: string, identity: MailIdentity, message: NormalizedGmailMessage, requestedProjectId?: string | null) {
   const { data: existingThread, error: threadLookupError } = await database
     .from("mail_threads")
-    .select("id, last_message_at")
+    .select("id, last_message_at, project_id")
     .eq("mail_connection_id", connectionId)
     .eq("provider_thread_id", message.providerThreadId)
     .maybeSingle();
   if (threadLookupError) throw new AppError("INTERNAL", "The mailbox thread could not be synchronized.");
+
+  if (requestedProjectId && existingThread?.project_id && requestedProjectId !== existingThread.project_id) {
+    throw new AppError("CONFLICT", "This conversation already belongs to another Project.");
+  }
+  const projectId = requestedProjectId ?? existingThread?.project_id ?? null;
 
   let threadId = existingThread?.id;
   if (!threadId) {
@@ -78,6 +83,7 @@ async function persistMessage(database: SupabaseClient, connectionId: string, ow
       mail_account_id: identity.id,
       mail_connection_id: connectionId,
       provider_thread_id: message.providerThreadId,
+      project_id: projectId,
       subject: message.subject,
       snippet: message.snippet,
       last_message_at: message.sentAt,
@@ -94,6 +100,7 @@ async function persistMessage(database: SupabaseClient, connectionId: string, ow
     mail_connection_id: connectionId,
     thread_id: threadId,
     provider_message_id: message.providerMessageId,
+    project_id: projectId,
     provider_history_id: message.providerHistoryId,
     internet_message_id: message.internetMessageId,
     from_address: message.fromAddress,
@@ -136,6 +143,7 @@ async function persistMessage(database: SupabaseClient, connectionId: string, ow
   const threadUpdate = {
     is_unread: Boolean(unread?.length),
     has_attachments: Boolean(attachmentRows?.length),
+    project_id: projectId,
     updated_at: new Date().toISOString(),
     ...(isLatest ? { mail_account_id: identity.id, subject: message.subject, snippet: message.snippet, last_message_at: message.sentAt } : {})
   };
@@ -223,7 +231,7 @@ export async function syncGmailConnection(database: SupabaseClient, connectionId
   return { mode, upserted, deleted: deletedMessageIds.size, skipped, historyId: latestHistoryId };
 }
 
-export async function syncGmailMessageById(database: SupabaseClient, connectionId: string, providerMessageId: string) {
+export async function syncGmailMessageById(database: SupabaseClient, connectionId: string, providerMessageId: string, projectId?: string | null) {
   const { connection, provider } = await loadGoogleProvider(database, connectionId);
   const { data: identities, error } = await database
     .from("mail_accounts")
@@ -238,6 +246,6 @@ export async function syncGmailMessageById(database: SupabaseClient, connectionI
   if (!normalized) throw new AppError("PROVIDER_UNAVAILABLE", "Google returned an unreadable message.");
   const identity = identityForMessage(normalized, identities);
   if (!identity) throw new AppError("CONFIGURATION", "The message does not belong to a configured KYM Mail identity.");
-  await persistMessage(database, connectionId, connection.owner_id, identity, normalized);
+  await persistMessage(database, connectionId, connection.owner_id, identity, normalized, projectId);
   return normalized;
 }

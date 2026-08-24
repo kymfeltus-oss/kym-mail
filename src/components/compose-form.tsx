@@ -4,15 +4,36 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Paperclip, Send, X } from "lucide-react";
 
-type Identity = { email_address: string; label: string; is_default: boolean };
+type Identity = { id: string; email_address: string; label: string; is_default: boolean };
+type ComposeProject = { id: string; name: string; default_mail_account_id: string | null };
 
-export function ComposeForm({ identities, reply }: { identities: Identity[]; reply?: { to: string; subject: string; providerThreadId: string; replyToMessageId: string } }) {
+export function ComposeForm({ identities, projects = [], initialProjectId = "", reply }: {
+  identities: Identity[];
+  projects?: ComposeProject[];
+  initialProjectId?: string;
+  reply?: { to: string; subject: string; providerThreadId: string; replyToMessageId: string };
+}) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
+  const globalDefault = identities.find((identity) => identity.is_default) ?? identities[0];
+  const initialProject = projects.find((project) => project.id === initialProjectId);
+  const initialProjectIdentity = identities.find((identity) => identity.id === initialProject?.default_mail_account_id);
+  const [projectId, setProjectId] = useState(initialProject?.id ?? "");
+  const [from, setFrom] = useState(initialProject ? initialProjectIdentity?.email_address ?? "" : globalDefault?.email_address ?? "");
   const [advanced, setAdvanced] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [status, setStatus] = useState<"idle" | "sending" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  const selectedProject = projects.find((project) => project.id === projectId);
+  const defaultIdentityUnavailable = Boolean(selectedProject && !identities.some((identity) => identity.id === selectedProject.default_mail_account_id));
+
+  function selectProject(nextProjectId: string) {
+    setProjectId(nextProjectId);
+    const project = projects.find((item) => item.id === nextProjectId);
+    if (!project) { setFrom(globalDefault?.email_address ?? ""); return; }
+    const identity = identities.find((item) => item.id === project.default_mail_account_id);
+    setFrom(identity?.email_address ?? "");
+  }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setStatus("sending"); setError(null);
@@ -31,9 +52,18 @@ export function ComposeForm({ identities, reply }: { identities: Identity[]; rep
   return <form ref={formRef} onSubmit={submit} className="glass min-w-0 rounded-3xl p-5 sm:p-8">
     {reply && <><input type="hidden" name="providerThreadId" value={reply.providerThreadId} /><input type="hidden" name="replyToMessageId" value={reply.replyToMessageId} /></>}
     <div className="grid min-w-0 gap-5">
+      <label className="grid min-w-0 gap-2 text-sm font-semibold text-[#183A5A]">Project
+        <select name="projectId" value={projectId} onChange={(event) => selectProject(event.target.value)} className="w-full min-w-0 rounded-xl border border-[#E8E2E3] bg-[#FFFCFB] px-4 py-3 font-normal text-[#183A5A] outline-none focus:border-[#D95B72]">
+          <option value="">None</option>
+          {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+        </select>
+        <span className="font-normal text-[#64748B]">Optional. Ordinary email does not require a Project.</span>
+      </label>
+      {defaultIdentityUnavailable && <div role="alert" className="rounded-2xl border border-[#F0C9D0] bg-[#FFF3F4] px-4 py-3"><p className="text-sm font-semibold text-[#A73D52]">Project default sender is unavailable</p><p className="mt-1 text-xs leading-5 text-[#64748B]">Choose a verified From identity explicitly. KYM Mail will not switch senders silently.</p></div>}
       <label className="grid min-w-0 gap-2 text-sm font-semibold text-[#183A5A]">From
-        <select name="from" defaultValue={identities.find((identity) => identity.is_default)?.email_address ?? identities[0]?.email_address} required className="w-full min-w-0 rounded-xl border border-[#E8E2E3] bg-[#FFFCFB] px-4 py-3 font-normal text-[#183A5A] outline-none focus:border-[#D95B72]">
-          {identities.map((identity) => <option key={identity.email_address} value={identity.email_address}>{identity.email_address} — {identity.label}</option>)}
+        <select name="from" value={from} onChange={(event) => setFrom(event.target.value)} required className="w-full min-w-0 rounded-xl border border-[#E8E2E3] bg-[#FFFCFB] px-4 py-3 font-normal text-[#183A5A] outline-none focus:border-[#D95B72]">
+          <option value="">Select a verified sender</option>
+          {identities.map((identity) => <option key={identity.id} value={identity.email_address}>{identity.email_address} — {identity.label}</option>)}
         </select>
       </label>
       <label className="grid min-w-0 gap-2 text-sm font-semibold text-[#183A5A]">To
@@ -56,6 +86,6 @@ export function ComposeForm({ identities, reply }: { identities: Identity[]; rep
       </div>
     </div>
     {error && <p role="alert" className="mt-5 rounded-xl bg-[#FFF3F4] px-4 py-3 text-sm text-[#A73D52]">{error}</p>}
-    <div className="mt-7 flex justify-end"><button type="submit" disabled={status === "sending" || !identities.length} className="inline-flex items-center gap-2 rounded-full bg-[#D95B72] px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(217,91,114,.22)] transition hover:bg-[#C94C64] disabled:cursor-wait disabled:opacity-60"><Send className="size-4" /> {status === "sending" ? "Sending…" : "Send email"}</button></div>
+    <div className="mt-7 flex justify-end"><button type="submit" disabled={status === "sending" || !identities.length || !from} className="inline-flex items-center gap-2 rounded-full bg-[#D95B72] px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(217,91,114,.22)] transition hover:bg-[#C94C64] disabled:cursor-not-allowed disabled:opacity-60"><Send className="size-4" /> {status === "sending" ? "Sending…" : "Send email"}</button></div>
   </form>;
 }
