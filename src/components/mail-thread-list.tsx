@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Paperclip } from "lucide-react";
+import { formatMailListTimestamp } from "@/lib/mail/date-format";
 
 export type ThreadListItem = {
   id: string;
@@ -20,7 +21,7 @@ export function MailThreadList({ threads, emptyTitle, emptyMessage }: { threads:
         <p className="mt-1 truncate text-sm text-[#64748B]">{thread.snippet || "No message preview available."}</p>
         <p className="mt-2 text-[11px] font-semibold uppercase tracking-[.1em] text-[#A73D52]">{thread.identityEmail}</p>
       </div>
-      <time className="text-xs text-[#64748B]" dateTime={thread.last_message_at}>{new Date(thread.last_message_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</time>
+      <time className="text-xs text-[#64748B]" dateTime={thread.last_message_at}>{formatMailListTimestamp(thread.last_message_at)}</time>
     </Link>)}
   </div>;
 }

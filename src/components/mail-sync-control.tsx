@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { formatMailTimestamp } from "@/lib/mail/date-format";
 
 type State = "idle" | "syncing" | "complete" | "error";
 
@@ -36,7 +37,7 @@ export function MailSyncControl({ connected, initialSyncComplete, lastSyncedAt }
       {state === "syncing" ? "Synchronizing…" : initialSyncComplete ? "Sync now" : "Start mailbox sync"}
     </button>
     <p className="text-xs text-[#64748B]">
-      {state === "syncing" ? "Retrieving real Gmail messages…" : state === "complete" ? "Mailbox synchronized." : lastSyncedAt ? `Last synchronized ${new Date(lastSyncedAt).toLocaleString()}` : "Mailbox has not synchronized yet."}
+      {state === "syncing" ? "Retrieving real Gmail messages…" : state === "complete" ? "Mailbox synchronized." : lastSyncedAt ? `Last synchronized ${formatMailTimestamp(lastSyncedAt)}` : "Mailbox has not synchronized yet."}
     </p>
     {error && <p role="alert" className="w-full text-xs text-[#A73D52]">{error}</p>}
   </div>;

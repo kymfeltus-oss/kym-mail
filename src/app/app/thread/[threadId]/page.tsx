@@ -3,6 +3,7 @@ import { Paperclip } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ComposeForm } from "@/components/compose-form";
 import { getOwnerContext } from "@/lib/auth/owner-context";
+import { formatMailTimestamp } from "@/lib/mail/date-format";
 
 export const metadata = { title: "Thread" };
 
@@ -33,7 +34,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ threadI
     <div className="mx-auto max-w-4xl">
       <p className="text-xs font-semibold uppercase tracking-[.22em] text-[#D95B72]">Conversation</p><h1 className="mt-2 text-2xl font-semibold tracking-[-.025em] text-[#183A5A] sm:text-3xl">{thread.subject}</h1>
       <div className="mt-7 space-y-4">{(messages ?? []).map((message) => <article key={message.id} className="rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-5 shadow-[0_14px_40px_rgba(24,58,90,.06)] sm:p-7">
-        <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[#E8E2E3] pb-4"><div><p className="text-sm font-semibold text-[#183A5A]">From: {message.from_address}</p><p className="mt-1 text-xs text-[#64748B]">To: {message.to_addresses.join(", ") || "Undisclosed recipient"}</p>{message.cc_addresses.length > 0 && <p className="mt-1 text-xs text-[#64748B]">CC: {message.cc_addresses.join(", ")}</p>}<p className="mt-2 text-[11px] font-semibold uppercase tracking-[.1em] text-[#A73D52]">{identityEmails.get(message.mail_account_id) ?? "KYM Mail"}</p></div><time className="text-xs text-[#64748B]" dateTime={message.sent_at}>{new Date(message.sent_at).toLocaleString()}</time></header>
+        <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[#E8E2E3] pb-4"><div><p className="text-sm font-semibold text-[#183A5A]">From: {message.from_address}</p><p className="mt-1 text-xs text-[#64748B]">To: {message.to_addresses.join(", ") || "Undisclosed recipient"}</p>{message.cc_addresses.length > 0 && <p className="mt-1 text-xs text-[#64748B]">CC: {message.cc_addresses.join(", ")}</p>}<p className="mt-2 text-[11px] font-semibold uppercase tracking-[.1em] text-[#A73D52]">{identityEmails.get(message.mail_account_id) ?? "KYM Mail"}</p></div><time className="text-xs text-[#64748B]" dateTime={message.sent_at}>{formatMailTimestamp(message.sent_at)}</time></header>
         {message.sanitized_html_body ? <div className="email-content mt-5 text-sm leading-7 text-[#243B53]" dangerouslySetInnerHTML={{ __html: message.sanitized_html_body }} /> : <p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-[#243B53]">{message.text_body || "This message has no displayable body."}</p>}
         {(attachmentsByMessage.get(message.id) ?? []).length > 0 && <ul className="mt-5 space-y-2 border-t border-[#E8E2E3] pt-4">{(attachmentsByMessage.get(message.id) ?? []).map((attachment) => <li key={attachment.id}><a href={`/api/mail/attachments/${attachment.id}`} className="flex items-center gap-2 text-xs font-semibold text-[#A73D52] hover:underline"><Paperclip className="size-3.5" /> {attachment.filename} · {(Number(attachment.size_bytes) / 1024).toFixed(1)} KB</a></li>)}</ul>}
       </article>)}</div>
