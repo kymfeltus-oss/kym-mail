@@ -8,6 +8,18 @@ import { normalizeGmailMessage, type GmailMessage, type NormalizedGmailMessage }
 type MailIdentity = { id: string; email_address: string; is_default: boolean };
 type SyncMode = "initial" | "incremental";
 
+export function uniqueProviderAttachments<T extends { providerAttachmentId: string }>(attachments: T[]) {
+  return [...new Map(attachments.map((attachment) => [attachment.providerAttachmentId, attachment])).values()];
+}
+
+export function staleProviderAttachmentRowIds(
+  existing: Array<{ id: string; provider_attachment_id: string }>,
+  currentProviderIds: Iterable<string>
+) {
+  const current = new Set(currentProviderIds);
+  return existing.filter((attachment) => !current.has(attachment.provider_attachment_id)).map((attachment) => attachment.id);
+}
+
 export type GmailSyncResult = {
   mode: SyncMode;
   upserted: number;
@@ -119,7 +131,14 @@ async function persistMessage(database: SupabaseClient, connectionId: string, ow
   }, { onConflict: "mail_connection_id,provider_message_id" }).select("id").single();
   if (messageError || !persistedMessage) throw new AppError("INTERNAL", "The mailbox message could not be persisted.");
 
-  for (const attachment of message.attachments) {
+  const currentAttachments = uniqueProviderAttachments(message.attachments);
+  const { data: existingAttachments, error: existingAttachmentsError } = await database
+    .from("mail_attachments")
+    .select("id, provider_attachment_id")
+    .eq("message_id", persistedMessage.id);
+  if (existingAttachmentsError) throw new AppError("INTERNAL", "Attachment metadata could not be synchronized.");
+
+  for (const attachment of currentAttachments) {
     const { error } = await database.from("mail_attachments").upsert({
       owner_id: ownerId,
       message_id: persistedMessage.id,
@@ -129,6 +148,14 @@ async function persistMessage(database: SupabaseClient, connectionId: string, ow
       size_bytes: attachment.sizeBytes
     }, { onConflict: "message_id,provider_attachment_id" });
     if (error) throw new AppError("INTERNAL", "Attachment metadata could not be persisted.");
+  }
+  const staleAttachmentIds = staleProviderAttachmentRowIds(
+    existingAttachments ?? [],
+    currentAttachments.map((attachment) => attachment.providerAttachmentId)
+  );
+  if (staleAttachmentIds.length) {
+    const { error } = await database.from("mail_attachments").delete().in("id", staleAttachmentIds).eq("message_id", persistedMessage.id);
+    if (error) throw new AppError("INTERNAL", "Stale attachment metadata could not be removed.");
   }
 
   const [{ data: unread }, { data: threadMessages }] = await Promise.all([
