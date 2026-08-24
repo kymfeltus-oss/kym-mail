@@ -1,0 +1,24 @@
+# dependencies and build output
+/node_modules
+/.next
+/out
+/coverage
+/test-results
+/playwright-report
+
+# environment (the example is intentionally tracked)
+.env*
+!.env.example
+
+# local tooling and platform metadata
+*.log
+.DS_Store
+Thumbs.db
+/.vercel
+*.tsbuildinfo
+/supabase/.temp/
+
+# credentials must never enter the repository
+client_secret_*.json
+*.pem
+*.p12

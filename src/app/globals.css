@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  --navy: #183a5a;
+  --rose: #d95b72;
+  --coral: #e97878;
+  --blush: #f7dde1;
+  --pale-blush: #fff3f4;
+  --warm-white: #fffcfb;
+  --slate: #64748b;
+  --border: #e8e2e3;
+}
+* { box-sizing: border-box; }
+html { background: var(--warm-white); }
+body { margin: 0; min-height: 100vh; color: var(--navy); background: radial-gradient(circle at 86% 8%, rgba(247,221,225,.72), transparent 29rem), radial-gradient(circle at 4% 92%, rgba(255,243,244,.95), transparent 26rem), var(--warm-white); font-family: Arial, Helvetica, sans-serif; }
+button, input { font: inherit; }
+select, textarea { font: inherit; }
+button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--rose); outline-offset: 3px; }
+.glass { background: rgba(255,252,251,.88); border: 1px solid var(--border); box-shadow: 0 24px 70px rgba(24,58,90,.1); backdrop-filter: blur(18px); }
+.brand-mark { background: linear-gradient(135deg, var(--rose), var(--coral) 58%, #e8a07f); box-shadow: 0 10px 24px rgba(217,91,114,.22); }
+.signature-gradient { background: linear-gradient(90deg, var(--rose), var(--coral), #e8a07f); background-clip: text; color: transparent; }
+.email-content { overflow-wrap: anywhere; }
+.email-content a { color: var(--rose); text-decoration: underline; }
+.email-content table { max-width: 100%; border-collapse: collapse; }
+.email-content blockquote { margin-left: 0; border-left: 3px solid var(--blush); padding-left: 1rem; color: var(--slate); }

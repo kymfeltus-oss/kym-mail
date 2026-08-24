@@ -1,0 +1,1 @@
+export default function Loading() { return <main className="grid min-h-screen place-items-center"><p role="status" className="text-sm text-[#64748B]">Loading <span className="font-semibold text-[#D95B72]">KYM Mail</span>…</p></main>; }
