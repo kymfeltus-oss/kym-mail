@@ -15,6 +15,10 @@ const supabaseAdminEnvSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20)
 });
 
+const schedulerEnvSchema = z.object({
+  CRON_SECRET: z.string().min(32)
+});
+
 const googleMailEnvSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().min(10),
   GOOGLE_CLIENT_SECRET: z.string().min(10),
@@ -56,6 +60,12 @@ export function getDevAuthEnv(input: Record<string, string | undefined> = proces
 export function getSupabaseAdminEnv(input: Record<string, string | undefined> = process.env) {
   const result = supabaseAdminEnvSchema.safeParse(input);
   if (!result.success) throw new ConfigurationError("Server database access is not configured.");
+  return result.data;
+}
+
+export function getSchedulerEnv(input: Record<string, string | undefined> = process.env) {
+  const result = schedulerEnvSchema.safeParse(input);
+  if (!result.success) throw new ConfigurationError("Scheduled delivery is not configured.");
   return result.data;
 }
 

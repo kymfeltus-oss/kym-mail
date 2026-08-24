@@ -59,4 +59,22 @@ describe("GoogleMailProvider authorization recovery", () => {
       })
     });
   });
+
+  it("uses the deterministic scheduled Message-ID in the provider payload", async () => {
+    configureGoogleEnvironment();
+    let raw = "";
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
+      raw = String(JSON.parse(String(init?.body)).raw);
+      return new Response(JSON.stringify({ id: "provider-message", threadId: "provider-thread" }), { status: 200 });
+    }));
+    const database = { from() { return { update() { return { async eq() { return { error: null }; } }; } }; } } as unknown as SupabaseClient;
+    const provider = new GoogleMailProvider({
+      id: "connection-id",
+      encrypted_access_token: encryptToken("access-token"),
+      encrypted_refresh_token: encryptToken("refresh-token"),
+      token_expires_at: new Date(Date.now() + 120_000).toISOString()
+    }, database);
+    await provider.send({ from: "kym@kymmailapp.com", to: ["recipient@example.com"], subject: "Scheduled", textBody: "Approved body", messageId: "<kym-schedule-test@kymmailapp.com>" });
+    expect(Buffer.from(raw, "base64url").toString("utf8")).toContain("Message-ID: <kym-schedule-test@kymmailapp.com>");
+  });
 });

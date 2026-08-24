@@ -88,6 +88,7 @@ export class GoogleMailProvider implements MailProvider {
       ...(message.bcc?.length ? [`Bcc: ${message.bcc.map(safeHeader).join(", ")}`] : []),
       `Subject: =?UTF-8?B?${Buffer.from(safeHeader(message.subject)).toString("base64")}?=`,
       `Date: ${new Date().toUTCString()}`,
+      ...(message.messageId ? [`Message-ID: ${safeHeader(message.messageId)}`] : []),
       "MIME-Version: 1.0",
       ...(message.replyToMessageId ? [`In-Reply-To: ${safeHeader(message.replyToMessageId)}`, `References: ${safeHeader(message.replyToMessageId)}`] : [])
     ];

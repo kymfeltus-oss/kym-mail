@@ -9,6 +9,7 @@ export type OutgoingMail = {
   textBody: string;
   htmlBody?: string;
   attachments?: MailAttachmentInput[];
+  messageId?: string;
   replyToMessageId?: string;
   threadId?: string;
 };

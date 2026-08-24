@@ -7,6 +7,7 @@ import { ProjectStatusControls } from "@/components/project-status-controls";
 import { getOwnerContext } from "@/lib/auth/owner-context";
 import { formatMailTimestamp } from "@/lib/mail/date-format";
 import { projectStatusLabels, projectTypeLabels, type ProjectStatus, type ProjectType } from "@/lib/projects/validation";
+import { scheduledEventLabels } from "@/lib/scheduling/constants";
 
 export const metadata = { title: "Project" };
 
@@ -19,15 +20,20 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
   const { data: project, error } = await owner.database.from("projects").select("id, name, type, objective, status, default_mail_account_id, parameter_schema_version, parameters, created_at, updated_at").eq("id", projectId).eq("owner_id", owner.user.id).maybeSingle();
   if (error) throw new Error("PROJECT_UNAVAILABLE");
   if (!project) notFound();
-  const [{ data: identity, error: identityError }, { data: activity, error: activityError }, { data: threads, error: threadsError }] = await Promise.all([
+  const [{ data: identity, error: identityError }, { data: activity, error: activityError }, { data: scheduledActivity, error: scheduledActivityError }, { data: threads, error: threadsError }] = await Promise.all([
     project.default_mail_account_id ? owner.database.from("mail_accounts").select("id, email_address, label, is_active, send_as_state").eq("id", project.default_mail_account_id).eq("owner_id", owner.user.id).maybeSingle() : Promise.resolve({ data: null, error: null }),
     owner.database.from("project_activity").select("id, activity_type, details, occurred_at").eq("project_id", project.id).eq("owner_id", owner.user.id).order("occurred_at", { ascending: false }).limit(12),
+    owner.database.from("scheduled_message_events").select("id, event_type, details, occurred_at").eq("project_id", project.id).eq("owner_id", owner.user.id).order("occurred_at", { ascending: false }).limit(12),
     owner.database.from("mail_threads").select("id, subject, snippet, last_message_at, is_unread").eq("project_id", project.id).eq("owner_id", owner.user.id).order("last_message_at", { ascending: false }).limit(6)
   ]);
-  if (identityError || activityError || threadsError) throw new Error("PROJECT_UNAVAILABLE");
+  if (identityError || activityError || scheduledActivityError || threadsError) throw new Error("PROJECT_UNAVAILABLE");
   const identityAvailable = Boolean(identity?.is_active && identity.send_as_state === "available");
   const status = project.status as ProjectStatus;
   const type = project.type as ProjectType;
+  const combinedActivity = [
+    ...(activity ?? []).map((item) => ({ id: `project-${item.id}`, label: activityLabels[item.activity_type] ?? "Project activity", activityType: item.activity_type, details: item.details as Record<string, unknown>, occurredAt: item.occurred_at })),
+    ...(scheduledActivity ?? []).map((item) => ({ id: `schedule-${item.id}`, label: scheduledEventLabels[item.event_type] ?? "Schedule activity", activityType: item.event_type, details: item.details as Record<string, unknown>, occurredAt: item.occurred_at }))
+  ].sort((left, right) => right.occurredAt.localeCompare(left.occurredAt)).slice(0, 12);
 
   return <AppShell email={owner.user.email} canSignOut={owner.mode === "authenticated"} active="projects">
     <div className="mx-auto max-w-6xl">
@@ -40,7 +46,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ projec
       <div className="mt-8 grid min-w-0 gap-8 xl:grid-cols-[1.2fr_.8fr]">
         <section className="min-w-0 space-y-6"><div className="rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-5 shadow-[0_14px_42px_rgba(24,58,90,.06)] sm:p-7"><h2 className="text-xl font-semibold text-[#183A5A]">Overview</h2><dl className="mt-5 grid min-w-0 gap-4 sm:grid-cols-2"><div className="min-w-0"><dt className="text-xs font-semibold uppercase tracking-[.12em] text-[#64748B]">Default sender</dt><dd className={`mt-2 break-words text-sm font-semibold ${identityAvailable ? "text-[#183A5A]" : "text-[#A73D52]"}`}>{identity ? `${identity.email_address} — ${identity.label}` : "Unavailable identity"}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-[.12em] text-[#64748B]">Parameter schema</dt><dd className="mt-2 text-sm font-semibold text-[#183A5A]">Version {project.parameter_schema_version}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-[.12em] text-[#64748B]">Created</dt><dd className="mt-2 text-sm text-[#183A5A]">{formatMailTimestamp(project.created_at)}</dd></div><div><dt className="text-xs font-semibold uppercase tracking-[.12em] text-[#64748B]">Updated</dt><dd className="mt-2 text-sm text-[#183A5A]">{formatMailTimestamp(project.updated_at)}</dd></div></dl></div><ProjectParameters type={type} parameters={project.parameters as Record<string, unknown>} /></section>
 
-        <aside className="min-w-0 space-y-6"><section className="rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-5 shadow-[0_14px_42px_rgba(24,58,90,.06)] sm:p-6"><h2 className="text-lg font-semibold text-[#183A5A]">Project activity</h2>{activity?.length ? <ol className="mt-4 space-y-4">{activity.map((item) => { const details = item.details as Record<string, unknown>; return <li key={item.id} className="border-l-2 border-[#F7DDE1] pl-4"><p className="text-sm font-semibold text-[#183A5A]">{activityLabels[item.activity_type] ?? "Project activity"}</p>{item.activity_type === "STATUS_CHANGED" && <p className="mt-1 text-xs text-[#64748B]">{String(details.from ?? "")} → {String(details.to ?? "")}</p>}<time className="mt-1 block text-[11px] text-[#94A3B8]">{formatMailTimestamp(item.occurred_at)}</time></li>; })}</ol> : <p className="mt-3 text-sm leading-6 text-[#64748B]">No Project activity has been recorded.</p>}</section>
+        <aside className="min-w-0 space-y-6"><section className="rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-5 shadow-[0_14px_42px_rgba(24,58,90,.06)] sm:p-6"><h2 className="text-lg font-semibold text-[#183A5A]">Project activity</h2>{combinedActivity.length ? <ol className="mt-4 space-y-4">{combinedActivity.map((item) => <li key={item.id} className="border-l-2 border-[#F7DDE1] pl-4"><p className="text-sm font-semibold text-[#183A5A]">{item.label}</p>{item.activityType === "STATUS_CHANGED" && <p className="mt-1 text-xs text-[#64748B]">{String(item.details.from ?? "")} → {String(item.details.to ?? "")}</p>}<time className="mt-1 block text-[11px] text-[#94A3B8]">{formatMailTimestamp(item.occurredAt)}</time></li>)}</ol> : <p className="mt-3 text-sm leading-6 text-[#64748B]">No Project activity has been recorded.</p>}</section>
           <section className="rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-5 shadow-[0_14px_42px_rgba(24,58,90,.06)] sm:p-6"><h2 className="text-lg font-semibold text-[#183A5A]">Conversations</h2>{threads?.length ? <div className="mt-4 min-w-0 divide-y divide-[#E8E2E3]">{threads.map((thread) => <Link key={thread.id} href={`/app/thread/${thread.id}`} className="block min-w-0 py-3 first:pt-0 last:pb-0"><div className="flex min-w-0 items-center gap-2"><span className={`size-2 shrink-0 rounded-full ${thread.is_unread ? "bg-[#D95B72]" : "bg-[#D7D2D3]"}`} /><p className="min-w-0 truncate text-sm font-semibold text-[#183A5A]">{thread.subject}</p></div><p className="mt-1 min-w-0 truncate pl-4 text-xs text-[#64748B]">{thread.snippet || "No preview available."}</p></Link>)}</div> : <p className="mt-3 text-sm leading-6 text-[#64748B]">Emails sent with this Project selected will appear here.</p>}</section></aside>
       </div>
     </div>

@@ -2,10 +2,15 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Paperclip, Send, X } from "lucide-react";
+import { CalendarClock, Paperclip, Send, X } from "lucide-react";
 
 type Identity = { id: string; email_address: string; label: string; is_default: boolean };
 type ComposeProject = { id: string; name: string; default_mail_account_id: string | null };
+
+function localInputValue(date: Date) {
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
 
 export function ComposeForm({ identities, projects = [], initialProjectId = "", reply }: {
   identities: Identity[];
@@ -22,8 +27,11 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
   const [from, setFrom] = useState(initialProject ? initialProjectIdentity?.email_address ?? "" : globalDefault?.email_address ?? "");
   const [advanced, setAdvanced] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
-  const [status, setStatus] = useState<"idle" | "sending" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "sending" | "scheduling" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [scheduledLocal, setScheduledLocal] = useState(() => localInputValue(new Date(Date.now() + 5 * 60_000)));
+  const [timezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Chicago");
   const selectedProject = projects.find((project) => project.id === projectId);
   const defaultIdentityUnavailable = Boolean(selectedProject && !identities.some((identity) => identity.id === selectedProject.default_mail_account_id));
 
@@ -48,6 +56,31 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
       setStatus("error"); setError(cause instanceof Error ? cause.message : "The message could not be sent.");
     }
   }
+
+  async function schedule() {
+    const form = formRef.current;
+    if (!form?.reportValidity()) return;
+    const instant = new Date(scheduledLocal);
+    if (!scheduledLocal || !Number.isFinite(instant.getTime()) || instant.getTime() <= Date.now()) {
+      setStatus("error"); setError("Choose a valid future delivery date and time."); return;
+    }
+    setStatus("scheduling"); setError(null);
+    const data = new FormData(form);
+    data.delete("attachments"); files.forEach((file) => data.append("attachments", file));
+    data.set("scheduledFor", instant.toISOString()); data.set("timezone", timezone);
+    try {
+      const response = await fetch("/api/mail/schedule", { method: "POST", body: data });
+      const payload = await response.json() as { error?: string; id?: string };
+      if (!response.ok || !payload.id) throw new Error(payload.error || "The email could not be scheduled.");
+      router.push(`/app/scheduled/${payload.id}?scheduled=true`); router.refresh();
+    } catch (cause) {
+      setStatus("error"); setError(cause instanceof Error ? cause.message : "The email could not be scheduled.");
+    }
+  }
+
+  const schedulePreview = scheduledLocal && Number.isFinite(new Date(scheduledLocal).getTime())
+    ? new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(new Date(scheduledLocal))
+    : "Choose a future time";
 
   return <form ref={formRef} onSubmit={submit} className="glass min-w-0 rounded-3xl p-5 sm:p-8">
     {reply && <><input type="hidden" name="providerThreadId" value={reply.providerThreadId} /><input type="hidden" name="replyToMessageId" value={reply.replyToMessageId} /></>}
@@ -86,6 +119,12 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
       </div>
     </div>
     {error && <p role="alert" className="mt-5 rounded-xl bg-[#FFF3F4] px-4 py-3 text-sm text-[#A73D52]">{error}</p>}
-    <div className="mt-7 flex justify-end"><button type="submit" disabled={status === "sending" || !identities.length || !from} className="inline-flex items-center gap-2 rounded-full bg-[#D95B72] px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(217,91,114,.22)] transition hover:bg-[#C94C64] disabled:cursor-not-allowed disabled:opacity-60"><Send className="size-4" /> {status === "sending" ? "Sending…" : "Send email"}</button></div>
+    {scheduleOpen && <section aria-label="Schedule delivery" className="mt-6 rounded-2xl border border-[#E7B8C1] bg-[#FFF3F4] p-4 sm:p-5">
+      <div className="flex items-start justify-between gap-4"><div><h2 className="text-sm font-semibold text-[#183A5A]">Schedule delivery</h2><p className="mt-1 text-xs leading-5 text-[#64748B]">KYM Mail will send automatically using the approved message and sender.</p></div><button type="button" aria-label="Close scheduling" onClick={() => setScheduleOpen(false)} className="rounded-lg p-1 text-[#64748B]"><X className="size-4" /></button></div>
+      <label className="mt-4 grid gap-2 text-sm font-semibold text-[#183A5A]">Date and time<input type="datetime-local" value={scheduledLocal} min={localInputValue(new Date(Date.now() + 60_000))} onChange={(event) => setScheduledLocal(event.target.value)} className="w-full rounded-xl border border-[#E8E2E3] bg-[#FFFCFB] px-4 py-3 font-normal outline-none focus:border-[#D95B72]" /></label>
+      <p className="mt-3 text-sm font-semibold text-[#A73D52]">{schedulePreview}</p><p className="mt-1 text-xs text-[#64748B]">Timezone: {timezone}</p>
+      <button type="button" onClick={() => void schedule()} disabled={status === "scheduling" || !identities.length || !from} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#183A5A] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto"><CalendarClock className="size-4" /> {status === "scheduling" ? "Scheduling…" : "Confirm schedule"}</button>
+    </section>}
+    <div className="mt-7 flex flex-wrap justify-end gap-3"><button type="button" onClick={() => setScheduleOpen((current) => !current)} disabled={status === "sending" || status === "scheduling" || !identities.length || !from} className="inline-flex items-center gap-2 rounded-full border border-[#D95B72] bg-[#FFFCFB] px-6 py-3 text-sm font-semibold text-[#A73D52] disabled:opacity-60"><CalendarClock className="size-4" /> Schedule send</button><button type="submit" disabled={status === "sending" || status === "scheduling" || !identities.length || !from} className="inline-flex items-center gap-2 rounded-full bg-[#D95B72] px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(217,91,114,.22)] transition hover:bg-[#C94C64] disabled:cursor-not-allowed disabled:opacity-60"><Send className="size-4" /> {status === "sending" ? "Sending…" : "Send now"}</button></div>
   </form>;
 }

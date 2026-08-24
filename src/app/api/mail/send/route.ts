@@ -2,16 +2,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getOwnerContext } from "@/lib/auth/owner-context";
 import { toSafeError, ValidationError } from "@/lib/errors";
 import { log } from "@/lib/logger";
-import { blockedAttachmentPattern, validateComposeInput } from "@/lib/mail/compose-validation";
+import { validateAttachmentFiles } from "@/lib/mail/attachment-validation";
+import { validateComposeInput } from "@/lib/mail/compose-validation";
 import { loadGoogleProvider, syncGmailMessageById } from "@/lib/mail/gmail-sync";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { z } from "zod";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
-
-const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
-const MAX_TOTAL_ATTACHMENT_BYTES = 18 * 1024 * 1024;
 
 export async function POST(request: NextRequest) {
   const owner = await getOwnerContext();
@@ -36,8 +34,7 @@ export async function POST(request: NextRequest) {
     if (!input) throw new ValidationError("Check the sender, recipients, subject, and message body.");
 
     const files = form.getAll("attachments").filter((entry): entry is File => entry instanceof File && entry.size > 0);
-    const totalBytes = files.reduce((total, file) => total + file.size, 0);
-    if (totalBytes > MAX_TOTAL_ATTACHMENT_BYTES || files.some((file) => file.size > MAX_ATTACHMENT_BYTES || blockedAttachmentPattern.test(file.name))) {
+    if (!validateAttachmentFiles(files)) {
       throw new ValidationError("One or more attachments are unsupported or too large.");
     }
 

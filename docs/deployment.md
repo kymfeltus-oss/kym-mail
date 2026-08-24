@@ -16,10 +16,18 @@ Use Node 22, install dependencies, apply all SQL migrations in filename order to
 
 ## Vercel
 
-Connect the canonical repository, use the standard Next.js build, and set every value documented in `.env.example` for the intended environment. `SUPABASE_SERVICE_ROLE_KEY`, Google OAuth secrets, the OAuth state secret, and the token-encryption key are server-only. Configure production/site URLs and allowed redirects in Supabase Authentication and Google OAuth. Apply migrations separately before deployment. Run lint, typecheck, tests, build, and `npm audit` in CI.
+Connect the canonical repository, use the standard Next.js build, and set every value documented in `.env.example` for the intended environment. `SUPABASE_SERVICE_ROLE_KEY`, Google OAuth secrets, the OAuth state secret, the token-encryption key, and `CRON_SECRET` are server-only. Configure production/site URLs and allowed redirects in Supabase Authentication and Google OAuth. Apply migrations separately before deployment. Run lint, typecheck, tests, build, and `npm audit` in CI.
 
 Store live values only in `.env.local` and the Vercel environment-variable store. These values are never committed, copied into docs, or logged. Downloaded OAuth credential files are also excluded. Secret rotation must update both stores, retire the prior credential at the provider, redeploy production, and reverify OAuth, token refresh, synchronization, and sending.
 
 The app fails with a safe error when required configuration is missing. Preview deployments need their own permitted redirect URL. Pub/Sub must use the exact canonical HTTPS webhook as both push endpoint and OIDC audience, and its push service account must match `GMAIL_PUBSUB_PUSH_SERVICE_ACCOUNT`.
 
 For local development only, set `KYM_DEV_AUTH_BYPASS=true`, `KYM_DEV_OWNER_EMAIL` to an existing private owner, and `SUPABASE_SERVICE_ROLE_KEY` to the server-only project key. Set the flag to `false` to test normal login. Vercel production always ignores the bypass flag because the application also requires `NODE_ENV !== "production"`; do not configure the service-role key in client-prefixed variables.
+
+## Scheduled delivery operations
+
+`vercel.json` registers `GET /api/cron/scheduled-mail` every minute. Vercel Cron schedules are UTC, but each record stores a canonical `timestamptz` plus its IANA timezone for owner-facing display. Configure a high-entropy `CRON_SECRET` in the Vercel production environment before deploying; Vercel adds it as `Authorization: Bearer …` to cron requests. A direct unsigned request must return 401. The configured Vercel plan must support one-minute cron frequency.
+
+The executor safely overlaps: PostgreSQL claims due rows atomically, and the stable RFC Message-ID reconciles an ambiguous Gmail result before any retry. Automatic retries are limited to three attempts and use short deterministic backoff only for transient errors. Revoked OAuth, invalid content, missing attachments, and unavailable identities fail for owner action rather than switching sender or retrying forever. Stale `PROCESSING` rows recover after ten minutes. Operational checks should inspect safe status/error fields and structured event names; never log or query-export message bodies, recipients, tokens, or secrets for troubleshooting.
+
+To recover production, first restore OAuth/identity/attachment availability, then use the owner-visible Retry action on a `FAILED` record. Do not update `PROCESSING`/`SENT` states manually or delete `CANCELLED` history. A replacement executor may call the same service-only claim/recovery functions and existing `MailProvider`; Compose does not need to change.

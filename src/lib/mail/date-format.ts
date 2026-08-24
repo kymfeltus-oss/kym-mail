@@ -24,3 +24,16 @@ export function formatMailListTimestamp(value: string) {
 export function formatMailTimestamp(value: string) {
   return fullTimestampFormatter.format(new Date(value));
 }
+
+export function formatScheduledTimestamp(value: string, timezone: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short"
+  }).format(new Date(value));
+}

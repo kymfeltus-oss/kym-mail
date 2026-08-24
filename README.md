@@ -1,8 +1,8 @@
 # KYM Mail
 
-KYM Mail is a private, intelligent email and career-outreach application. This independent repository contains the verified Gate 1 foundation, Gate 2 Mail Core, and Gate 3 Projects layer: real Supabase authentication, an owner-scoped unified mailbox, Google OAuth, Gmail synchronization, compose/send/reply, attachments, two verified sending identities, and persistent contextual Projects.
+KYM Mail is a private, intelligent email and career-outreach application. This independent repository contains the verified Gate 1 foundation, Gate 2 Mail Core, Gate 3 Projects layer, and the Gate 4 scheduling implementation: real Supabase authentication, an owner-scoped unified mailbox, Google OAuth, Gmail synchronization, compose/send/reply, attachments, two verified sending identities, persistent contextual Projects, and deterministic scheduled delivery.
 
-AI, job-provider search, career intelligence, contact discovery, resume functionality, scheduling, and outreach automation remain explicitly outside the verified Gate 3 scope.
+AI, job-provider search, career intelligence, contact discovery, resume functionality, recurring/campaign delivery, and outreach automation remain outside Gate 4.
 
 ## Canonical environments
 
