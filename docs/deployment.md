@@ -24,6 +24,8 @@ The app fails with a safe error when required configuration is missing. Preview 
 
 Gate 5 also requires server-only `ADZUNA_APP_ID` and `ADZUNA_APP_KEY` values in local development and the Vercel production environment. Obtain them from the Adzuna Developer Portal, accept and follow its API terms/attribution requirements, and never expose them to client JavaScript or logs. The default limits are low enough that manual searches and Save verification should remain deliberate; a Save performs a second provider call to verify facts before persistence. Do not add automatic polling, job alerts, or provider monitoring under Gate 5.
 
+Gate 8 adds no external AI secret or resume-storage bucket. The configured deterministic provider reads the owner-scoped Gate 6/7 records through the authenticated server boundary. DOCX and PDF files are created on demand by a Node.js route, returned with private/no-store headers, and not persisted as public files. Apply migration `202608250013_tailored_resume_engine.sql` before deploying the Gate 8 routes. If a future AI provider is added, its key must remain server-only and its structured output must pass the same factual validator before persistence.
+
 For local development only, set `KYM_DEV_AUTH_BYPASS=true`, `KYM_DEV_OWNER_EMAIL` to an existing private owner, and `SUPABASE_SERVICE_ROLE_KEY` to the server-only project key. Set the flag to `false` to test normal login. Vercel production always ignores the bypass flag because the application also requires `NODE_ENV !== "production"`; do not configure the service-role key in client-prefixed variables.
 
 ## Scheduled delivery operations

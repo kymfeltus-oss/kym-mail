@@ -1,0 +1,68 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { AlertTriangle, Check, Download, FilePenLine, FileText, LoaderCircle, RefreshCw, Save, ShieldCheck } from "lucide-react";
+import type { ResumeContent, ResumeView } from "@/lib/resumes/types";
+import { formatResumeDate } from "@/lib/resumes/format";
+
+function ResumePreview({ content }: { content: ResumeContent }) {
+  return <article aria-label="Resume preview" className="mx-auto min-h-[880px] w-full max-w-[816px] bg-white px-5 py-7 text-[#183A5A] shadow-[0_12px_40px_rgba(24,58,90,.12)] sm:px-10 sm:py-9 lg:px-12">
+    <header className="text-center"><h2 className="text-2xl font-bold tracking-tight">{content.candidate.fullName}</h2><p className="mt-1 text-xs text-[#64748B]">{content.candidate.headline}</p>{content.candidate.location && <p className="mt-1 text-xs text-[#64748B]">{content.candidate.location}</p>}</header>
+    <ResumeSection title="Executive Summary"><p className="text-[11px] leading-[1.55]">{content.summary.text}</p></ResumeSection>
+    <ResumeSection title="Core Skills"><div className="space-y-1">{content.skillGroups.map((group) => <p key={group.category} className="text-[10px] leading-4"><strong>{group.category[0]}{group.category.slice(1).toLowerCase()}:</strong> <span className="text-[#64748B]">{group.skills.map((item) => item.name).join(" • ")}</span></p>)}</div></ResumeSection>
+    <ResumeSection title="Professional Experience"><div className="space-y-3">{content.experiences.map((experience) => <section key={experience.experienceId} className="break-inside-avoid"><h4 className="text-xs font-bold">{experience.title ?? "Title not provided"} <span className="text-[#D95B72]">| {experience.employer}</span></h4><p className="text-[9px] italic text-[#64748B]">{formatResumeDate(experience.startDate, experience.startPrecision)} – {formatResumeDate(experience.endDate, experience.endPrecision, experience.isCurrent)}{experience.client ? ` | Client: ${experience.client}` : ""}</p><ul className="mt-1 list-disc space-y-0.5 pl-4 text-[10px] leading-[1.45]">{experience.bullets.map((bullet) => <li key={bullet.key}>{bullet.text}</li>)}</ul></section>)}</div></ResumeSection>
+    {content.projects.length > 0 && <ResumeSection title="Selected Projects"><div className="space-y-2">{content.projects.map((project) => <section key={project.projectId}><h4 className="text-xs font-bold">{project.name}</h4><ul className="mt-1 list-disc space-y-0.5 pl-4 text-[10px] leading-[1.45]">{project.bullets.map((bullet) => <li key={bullet.key}>{bullet.text}</li>)}</ul></section>)}</div></ResumeSection>}
+    <ResumeSection title="Education & Credentials"><div className="space-y-1 text-[10px]">{content.education.map((item) => <p key={item.educationId}><strong>{item.degree}{item.fieldOfStudy ? ` in ${item.fieldOfStudy}` : ""}</strong> — {item.institution}</p>)}{content.credentials.map((item) => <p key={item.credentialId}><strong>{item.name}</strong> — {item.status[0]}{item.status.slice(1).toLowerCase()}</p>)}</div></ResumeSection>
+  </article>;
+}
+
+function ResumeSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return <section className="mt-4"><h3 className="border-b border-[#D95B72] pb-0.5 text-[10px] font-bold uppercase tracking-[.13em] text-[#D95B72]">{title}</h3><div className="mt-1.5">{children}</div></section>;
+}
+
+export function ResumeStudio({ jobId, jobTitle, employer, resume }: { jobId: string; jobTitle: string; employer: string; resume: ResumeView | null }) {
+  const router = useRouter();
+  const defaultVersion = resume?.versions.find((item) => item.id === resume.currentVersionId) ?? resume?.versions.find((item) => item.content) ?? null;
+  const [selectedVersionId, setSelectedVersionId] = useState(defaultVersion?.id ?? "");
+  const selectedVersion = useMemo(() => resume?.versions.find((item) => item.id === selectedVersionId) ?? defaultVersion, [defaultVersion, resume, selectedVersionId]);
+  const [draft, setDraft] = useState<ResumeContent | null>(selectedVersion?.content ? structuredClone(selectedVersion.content) : null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => { setDraft(selectedVersion?.content ? structuredClone(selectedVersion.content) : null); }, [selectedVersion]);
+
+  async function submit(body: Record<string, unknown>, label: string) {
+    setBusy(label); setError(null); setNotice(null);
+    try {
+      const response = await fetch(`/api/jobs/${jobId}/resume`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const payload = await response.json() as { error?: string; versionNumber?: number };
+      if (!response.ok) throw new Error(payload.error ?? "Resume request failed.");
+      setNotice(`Version ${payload.versionNumber} is ready and factual validation passed.`);
+      router.refresh();
+    } catch (caught) { setError(caught instanceof Error ? caught.message : "Resume request failed."); }
+    finally { setBusy(null); }
+  }
+
+  function updateBullet(key: string, text: string) {
+    if (!draft) return;
+    setDraft({ ...draft, experiences: draft.experiences.map((experience) => ({ ...experience, bullets: experience.bullets.map((bullet) => bullet.key === key ? { ...bullet, text } : bullet) })), projects: draft.projects.map((project) => ({ ...project, bullets: project.bullets.map((bullet) => bullet.key === key ? { ...bullet, text } : bullet) })) });
+  }
+
+  if (!resume || !defaultVersion?.content) return <section className="mt-7 rounded-[2rem] border border-[#E8E2E3] bg-[#FFFCFB] p-6 text-center shadow-[0_20px_60px_rgba(24,58,90,.08)] sm:p-10"><FileText className="mx-auto size-9 text-[#D95B72]" /><h2 className="mt-3 text-2xl font-semibold text-[#183A5A]">Create the first tailored version</h2><p className="mx-auto mt-2 max-w-2xl text-sm leading-6 text-[#64748B]">KYM Mail will build a deterministic resume plan from the current Career Match, then generate only from authoritative Gate 6 evidence.</p><button type="button" onClick={() => void submit({ action: "GENERATE" }, "generate")} disabled={Boolean(busy)} className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-full bg-[#D95B72] px-6 py-3 text-sm font-semibold text-white disabled:bg-[#D7A6AF]">{busy ? <LoaderCircle className="size-4 animate-spin" /> : <FilePenLine className="size-4" />} Create Tailored Resume</button>{error && <p role="alert" className="mx-auto mt-4 max-w-xl rounded-2xl bg-[#FFF0F1] p-3 text-sm text-[#A73D52]">{error}</p>}</section>;
+
+  return <div className="mt-7 space-y-5">
+    <section className="rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-4 shadow-[0_14px_42px_rgba(24,58,90,.06)] sm:p-5"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div><h2 className="flex items-center gap-2 text-xl font-semibold text-[#183A5A]"><ShieldCheck className="size-5 text-[#D95B72]" />Validated resume versions</h2><p className="mt-1 text-sm text-[#64748B]">{jobTitle} · {employer}</p></div><div className="flex flex-col gap-2 sm:flex-row"><label className="sr-only" htmlFor="resume-version">Resume version</label><select id="resume-version" value={selectedVersionId} onChange={(event) => setSelectedVersionId(event.target.value)} className="min-h-11 rounded-xl border border-[#E8E2E3] bg-white px-3 text-sm font-semibold text-[#183A5A]">{resume.versions.map((version) => <option key={version.id} value={version.id}>Version {version.versionNumber} · {version.generationKind.replaceAll("_", " ")} · {version.status}{version.id === resume.currentVersionId ? " · CURRENT" : ""}</option>)}</select><button type="button" onClick={() => void submit({ action: "REGENERATE", scope: "ENTIRE" }, "regenerate")} disabled={Boolean(busy)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[#D95B72] px-4 text-sm font-semibold text-[#A73D52]"><RefreshCw className={`size-4 ${busy === "regenerate" ? "animate-spin" : ""}`} /> Regenerate</button></div></div>
+      {selectedVersion?.status === "STALE" && <p className="mt-4 flex items-start gap-2 rounded-2xl bg-[#FFF0F1] p-3 text-sm text-[#A73D52]"><AlertTriangle className="mt-0.5 size-4 shrink-0" />This version is stale. Re-run Career Match and regenerate before relying on it.</p>}
+      {selectedVersion?.status === "FAILED" && <p className="mt-4 flex items-start gap-2 rounded-2xl bg-[#FFF0F1] p-3 text-sm text-[#A73D52]"><AlertTriangle className="mt-0.5 size-4 shrink-0" />{selectedVersion.failureMessage} The prior successful version remains available.</p>}
+      {notice && <p className="mt-4 flex items-center gap-2 rounded-2xl bg-[#E9F7F1] p-3 text-sm text-[#176B4C]"><Check className="size-4" />{notice}</p>}{error && <p role="alert" className="mt-4 rounded-2xl bg-[#FFF0F1] p-3 text-sm text-[#A73D52]">{error}</p>}
+    </section>
+    {draft && selectedVersion && <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,.82fr)_minmax(0,1.18fr)]"><section className="min-w-0 rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-4 shadow-[0_14px_42px_rgba(24,58,90,.06)] sm:p-6"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-semibold text-[#183A5A]">Review & edit</h2><button type="button" onClick={() => void submit({ action: "EDIT", content: draft }, "save")} disabled={Boolean(busy)} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#D95B72] px-4 text-sm font-semibold text-white"><Save className="size-4" /> Save New Version</button></div><p className="mt-2 text-xs leading-5 text-[#64748B]">Only summary, bullets, selected skills, and projects are editable. Employment, dates, education, and credentials remain locked to Gate 6.</p>
+      <label className="mt-5 block text-sm font-semibold text-[#183A5A]">Executive summary<textarea value={draft.summary.text} onChange={(event) => setDraft({ ...draft, summary: { ...draft.summary, text: event.target.value } })} rows={7} className="mt-2 w-full rounded-2xl border border-[#E8E2E3] bg-white p-3 text-sm font-normal leading-6 text-[#465B70]" /></label><button type="button" onClick={() => void submit({ action: "REGENERATE", scope: "SUMMARY" }, "summary")} disabled={Boolean(busy)} className="mt-2 inline-flex min-h-10 items-center gap-2 text-xs font-semibold text-[#A73D52]"><RefreshCw className="size-3.5" /> Regenerate summary</button>
+      <div className="mt-6 space-y-6">{draft.experiences.map((experience) => <section key={experience.experienceId}><h3 className="text-sm font-semibold text-[#183A5A]">{experience.title} · {experience.employer}</h3><p className="text-xs text-[#64748B]">Locked authoritative employment facts</p><div className="mt-3 space-y-3">{experience.bullets.map((bullet) => <div key={bullet.key}><textarea aria-label={`Bullet for ${experience.employer}`} value={bullet.text} onChange={(event) => updateBullet(bullet.key, event.target.value)} rows={4} className="w-full rounded-2xl border border-[#E8E2E3] bg-white p-3 text-sm leading-6 text-[#465B70]" /><button type="button" onClick={() => void submit({ action: "REGENERATE_BULLET", contentKey: bullet.key }, bullet.key)} disabled={Boolean(busy)} className="mt-1 inline-flex min-h-9 items-center gap-2 text-xs font-semibold text-[#A73D52]"><RefreshCw className="size-3.5" /> Regenerate bullet</button></div>)}</div></section>)}</div>
+      <fieldset className="mt-6"><legend className="text-sm font-semibold text-[#183A5A]">Skills</legend><div className="mt-2 grid gap-2 sm:grid-cols-2">{selectedVersion.content?.skillGroups.flatMap((group) => group.skills.map((skill) => { const checked = draft.skillGroups.some((candidate) => candidate.skills.some((item) => item.skillId === skill.skillId)); return <label key={skill.skillId} className="flex min-h-10 items-center gap-2 rounded-xl bg-white px-3 text-xs text-[#465B70]"><input type="checkbox" checked={checked} onChange={() => setDraft({ ...draft, skillGroups: draft.skillGroups.map((candidate) => ({ ...candidate, skills: candidate.skills.filter((item) => item.skillId !== skill.skillId) })).filter((candidate) => candidate.skills.length).concat(checked ? [] : [{ category: group.category, skills: [{ skillId: skill.skillId, name: skill.name }] }]) })} />{skill.name}</label>; }))}</div></fieldset>
+      {draft.projects.map((project) => <section key={project.projectId} className="mt-6"><h3 className="text-sm font-semibold text-[#183A5A]">Project · {project.name}</h3><div className="mt-2 space-y-3">{project.bullets.map((bullet) => <textarea key={bullet.key} aria-label={`Bullet for ${project.name}`} value={bullet.text} onChange={(event) => updateBullet(bullet.key, event.target.value)} rows={4} className="w-full rounded-2xl border border-[#E8E2E3] bg-white p-3 text-sm leading-6 text-[#465B70]" />)}</div></section>)}
+    </section><section className="min-w-0"><div className="mb-3 flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-semibold text-[#183A5A]">Preview</h2><div className="flex gap-2"><a href={`/api/resumes/${resume.id}/versions/${selectedVersion.id}/export?format=docx`} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#183A5A] px-4 text-sm font-semibold text-white"><Download className="size-4" /> DOCX</a><a href={`/api/resumes/${resume.id}/versions/${selectedVersion.id}/export?format=pdf`} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[#D95B72] px-4 text-sm font-semibold text-white"><Download className="size-4" /> PDF</a></div></div><ResumePreview content={draft} /></section></div>}
+  </div>;
+}
+

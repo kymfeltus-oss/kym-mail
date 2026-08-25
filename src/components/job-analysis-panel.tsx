@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, BarChart3, Check, ChevronDown, CircleHelp, FileSearch, Gauge, LoaderCircle, RefreshCw, ShieldCheck, Sparkles, Target, X } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, BarChart3, Check, ChevronDown, CircleHelp, FileSearch, FileText, Gauge, LoaderCircle, RefreshCw, ShieldCheck, Sparkles, Target, X } from "lucide-react";
 import type { RequirementCategory, RequirementMatchState } from "@/lib/jobs/analysis";
 import type { JobAnalysisView, RequirementView } from "@/lib/jobs/analysis-view";
 
@@ -197,6 +198,15 @@ export function JobAnalysisPanel({ jobId, analysis }: { jobId: string; analysis:
 
       {showResults && analysis && (
         <div className="min-w-0 space-y-8 p-5 sm:p-7">
+          {analysis.status === "COMPLETE" && (
+            <section className="flex flex-col gap-4 rounded-3xl border border-[#E7B8C1] bg-[linear-gradient(135deg,#FFF3F4,#FFFCFB)] p-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="flex items-center gap-2 text-lg font-semibold text-[#183A5A]"><FileText className="size-5 text-[#D95B72]" />Create a tailored resume</h3>
+                <p className="mt-1 text-sm leading-6 text-[#64748B]">Build a versioned, evidence-validated resume from this Career Match and the Master Career Profile.</p>
+              </div>
+              <Link href={`/app/jobs/saved/${jobId}/resume`} className="inline-flex min-h-12 shrink-0 items-center justify-center rounded-full bg-[#183A5A] px-5 py-3 text-sm font-semibold text-white">Open Resume Studio</Link>
+            </section>
+          )}
           <div className="grid min-w-0 gap-5 lg:grid-cols-[.7fr_1.3fr]">
             <section className="flex min-h-60 min-w-0 flex-col items-center justify-center rounded-3xl bg-[#183A5A] p-6 text-center text-white">
               <BarChart3 className="size-6 text-[#F7DDE1]" />

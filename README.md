@@ -1,8 +1,8 @@
 # KYM Mail
 
-KYM Mail is a private email and career-outreach application. This independent repository contains the verified Gate 1 foundation through Gate 7 Career Match: real Supabase authentication, an owner-scoped unified mailbox, contextual Projects, deterministic scheduled delivery, real Adzuna job discovery, Saved Jobs, the authoritative Master Career Profile, and evidence-linked job-match analysis.
+KYM Mail is a private email and career-outreach application. This independent repository contains the Gate 1 foundation through Gate 8 Tailored Resume Engine: real Supabase authentication, an owner-scoped unified mailbox, contextual Projects, deterministic scheduled delivery, real Adzuna job discovery, Saved Jobs, the authoritative Master Career Profile, evidence-linked job-match analysis, and versioned factual resume generation with DOCX/PDF export.
 
-Resume generation/tailoring, cover letters, contact discovery, automated applications, and downstream outreach orchestration remain outside Gate 7.
+Cover letters, contact discovery, automated applications, and downstream outreach orchestration remain outside Gate 8.
 
 ## Canonical environments
 
