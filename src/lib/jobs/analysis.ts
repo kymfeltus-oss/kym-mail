@@ -193,6 +193,7 @@ const industryPattern = /\b(healthcare|hospitality|retail|manufacturing|pharmace
 const systemPattern = /\b(sap|workday|oracle|netsuite|erp|hyperion|blackline|anaplan|coupa)\b/i;
 const technologyNamePattern = /\b(sql|python|power\s*bi|tableau|excel|javascript|vba|alteryx|salesforce|kubernetes)\b/i;
 const dataPattern = /\b(data pipeline|data warehouse|analytics|etl|snowflake)\b/i;
+const promptInjectionPattern = /\b(?:ignore|disregard|override|forget)\b.{0,100}\b(?:previous|prior|system|developer|instructions?|prompt)\b|\b(?:mark|rate|score)\b.{0,60}\b(?:candidate|applicant)\b.{0,60}\b(?:perfect|100(?:\s*percent|%)?)\b|\b(?:invent|fabricate|make up)\b/i;
 
 export function decodeJobDescription(value: string) {
   return value
@@ -332,6 +333,7 @@ function requirementImportance(text: string, section: RequirementImportance): Re
 
 function looksLikeRequirement(text: string) {
   if (text.length < 12) return false;
+  if (promptInjectionPattern.test(text)) return false;
   if (notApplicablePattern.test(text)) return true;
   if (contextPattern.test(text)) return false;
   return responsibilityPattern.test(text)
@@ -402,7 +404,10 @@ export function extractJobRequirements(description: string): ExtractedRequiremen
 
 export function groundRequirements(description: string, requirements: ExtractedRequirement[]): ExtractedRequirement[] {
   const haystack = normalizeAnalysisText(description).toLowerCase();
-  const grounded = requirements.filter((requirement) => haystack.includes(normalizeAnalysisText(requirement.originalText).toLowerCase()));
+  const grounded = requirements.filter((requirement) => {
+    const wording = normalizeAnalysisText(requirement.originalText);
+    return !promptInjectionPattern.test(wording) && haystack.includes(wording.toLowerCase());
+  });
   return grounded.map((requirement, index) => {
     const originalText = normalizeAnalysisText(requirement.originalText);
     return {

@@ -21,7 +21,7 @@ This directory is the KYM Mail repository boundary. It is not part of the unrela
 3. Copy `.env.example` to `.env.local` and fill in the Supabase, server-only Google Mail, scheduler, Adzuna, and—when enabling Gate 9 live contact discovery—Apollo values. Adzuna credentials come from [developer.adzuna.com](https://developer.adzuna.com/) and Apollo credentials from [Apollo API setup](https://docs.apollo.io/reference/apollo-api); both must remain server-only. Never commit `.env` files, OAuth/client/API secrets, service-role keys, token-encryption keys, downloaded credential JSON, or platform metadata.
 4. Run `npm run dev`, then open `http://localhost:3000`.
 
-Career imports are an owner-approved administrative operation. Validate an intake manifest and run `npm run career:import -- <path>` only with the server-only service-role environment configured. Intake manifests and source resumes are not application assets and must not be committed.
+Career imports are an owner-approved administrative operation. Validate an intake manifest and run `npm run career:import -- <path>` only with the server-only service-role environment configured. The authenticated owner may review and edit factual records in the Master Career Profile; every edit is forced to resolved authority and preserved in private immutable history. Intake manifests and source resumes are not application assets and must not be committed.
 
 Quality commands: `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, and `npm audit`.
 
