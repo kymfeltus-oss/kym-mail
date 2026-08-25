@@ -8,7 +8,7 @@ const navigation = [
   { href: "/app", label: "Home", desktopLabel: "Dashboard", icon: LayoutDashboard, active: "dashboard" as const },
   { href: "/app/inbox", label: "Inbox", desktopLabel: "Inbox", icon: Inbox, active: "inbox" as const },
   { href: "/app/sent", label: "Sent", desktopLabel: "Sent", icon: Send, active: "sent" as const },
-  { href: "/app/scheduled", label: "Scheduled", desktopLabel: "Scheduled", icon: CalendarClock, active: "scheduled" as const },
+  { href: "/app/scheduled", label: "Schedule", desktopLabel: "Scheduled", icon: CalendarClock, active: "scheduled" as const },
   { href: "/app/projects", label: "Projects", desktopLabel: "Projects", icon: FolderKanban, active: "projects" as const },
   { href: "/app/jobs", label: "Jobs", desktopLabel: "Jobs", icon: BriefcaseBusiness, active: "jobs" as const },
   { href: "/app/career", label: "Career", desktopLabel: "Career Profile", icon: BookOpenCheck, active: "career" as const },
@@ -36,7 +36,7 @@ export function AppShell({ email, canSignOut, active = "dashboard", children }: 
     </aside>
     <main className="min-w-0 px-5 py-8 pb-28 sm:px-8 lg:px-12 lg:py-12">{children}</main>
     <nav aria-label="Mobile primary" className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-8 rounded-2xl border border-white/15 bg-[#183A5A]/95 p-2 text-white shadow-[0_18px_46px_rgba(24,58,90,.28)] backdrop-blur-xl lg:hidden">
-      {navigation.map((item) => { const Icon = item.icon; const selected = active === item.active; return <Link key={item.href} href={item.href} aria-current={selected ? "page" : undefined} className={`flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[10px] font-semibold transition ${selected ? "bg-[#F7DDE1] text-[#183A5A]" : "text-white/65"}`}><Icon className={`size-4 ${selected ? "text-[#D95B72]" : ""}`} /><span className="truncate">{item.label}</span></Link>; })}
+      {navigation.map((item) => { const Icon = item.icon; const selected = active === item.active; return <Link key={item.href} href={item.href} aria-current={selected ? "page" : undefined} className={`flex min-w-0 flex-col items-center gap-1 rounded-xl px-0.5 py-2 text-[9px] font-semibold transition ${selected ? "bg-[#F7DDE1] text-[#183A5A]" : "text-white/65"}`}><Icon className={`size-4 ${selected ? "text-[#D95B72]" : ""}`} /><span className="truncate">{item.label}</span></Link>; })}
     </nav>
   </div>;
 }
