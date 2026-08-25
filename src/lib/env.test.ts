@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getSchedulerEnv, isDevAuthBypassEnabled, parsePublicEnv } from "./env";
+import { getJobSearchEnv, getSchedulerEnv, isDevAuthBypassEnabled, parsePublicEnv } from "./env";
 import { ConfigurationError } from "./errors";
 describe("environment validation", () => {
   it("accepts complete public configuration", () => expect(parsePublicEnv({ NEXT_PUBLIC_SUPABASE_URL: "https://project.supabase.co", NEXT_PUBLIC_SUPABASE_ANON_KEY: "a".repeat(20) }).NEXT_PUBLIC_SUPABASE_URL).toContain("supabase.co"));
@@ -14,5 +14,11 @@ describe("scheduler environment", () => {
   it("requires a server-only high-entropy cron secret", () => {
     expect(getSchedulerEnv({ CRON_SECRET: "s".repeat(32) }).CRON_SECRET).toHaveLength(32);
     expect(() => getSchedulerEnv({ CRON_SECRET: "short" })).toThrow(ConfigurationError);
+  });
+});
+describe("Job Search environment", () => {
+  it("requires server-only Adzuna credentials", () => {
+    expect(getJobSearchEnv({ ADZUNA_APP_ID: "app-id", ADZUNA_APP_KEY: "secret-key" }).ADZUNA_APP_ID).toBe("app-id");
+    expect(() => getJobSearchEnv({})).toThrow(ConfigurationError);
   });
 });

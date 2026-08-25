@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowRight, CalendarClock, FolderKanban, Inbox, MailCheck, Plus, SquarePen } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, CalendarClock, FolderKanban, Inbox, MailCheck, Plus, SquarePen } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { getOwnerContext } from "@/lib/auth/owner-context";
 import { formatMailTimestamp } from "@/lib/mail/date-format";
@@ -28,7 +28,9 @@ export default async function DashboardPage() {
     { data: identities, error: identitiesError },
     { data: activity, error: activityError },
     { count: scheduledCount, error: scheduledCountError },
-    { data: nextScheduled, error: nextScheduledError }
+    { data: nextScheduled, error: nextScheduledError },
+    { count: savedJobsCount, error: savedJobsCountError },
+    { data: recentJobs, error: recentJobsError }
   ] = await Promise.all([
     database.from("mail_threads").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("is_unread", true),
     database.from("projects").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("status", "ACTIVE"),
@@ -37,9 +39,11 @@ export default async function DashboardPage() {
     database.from("mail_accounts").select("id, email_address, label, is_default, is_active, send_as_state").eq("owner_id", user.id).order("is_default", { ascending: false }),
     database.from("project_activity").select("id, project_id, activity_type, occurred_at").eq("owner_id", user.id).order("occurred_at", { ascending: false }).limit(6),
     database.from("scheduled_messages").select("id", { count: "exact", head: true }).eq("owner_id", user.id).in("status", ["SCHEDULED", "PROCESSING"]),
-    database.from("scheduled_messages").select("id, subject, scheduled_for, timezone").eq("owner_id", user.id).eq("status", "SCHEDULED").order("scheduled_for").limit(1).maybeSingle()
+    database.from("scheduled_messages").select("id, subject, scheduled_for, timezone").eq("owner_id", user.id).eq("status", "SCHEDULED").order("scheduled_for").limit(1).maybeSingle(),
+    database.from("job_opportunities").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("status", "SAVED"),
+    database.from("job_opportunities").select("id, title, company_name, location_text, saved_at").eq("owner_id", user.id).eq("status", "SAVED").order("saved_at", { ascending: false }).limit(3)
   ]);
-  if (unreadError || projectCountError || projectsError || threadsError || identitiesError || activityError || scheduledCountError || nextScheduledError) throw new Error("DASHBOARD_UNAVAILABLE");
+  if (unreadError || projectCountError || projectsError || threadsError || identitiesError || activityError || scheduledCountError || nextScheduledError || savedJobsCountError || recentJobsError) throw new Error("DASHBOARD_UNAVAILABLE");
 
   const activityProjectIds = [...new Set((activity ?? []).map((item) => item.project_id))];
   const { data: activityProjects, error: activityProjectsError } = activityProjectIds.length
@@ -56,11 +60,12 @@ export default async function DashboardPage() {
         <div className="flex flex-wrap gap-3"><Link href="/app/projects/new" className="inline-flex items-center gap-2 rounded-full border border-[#E7B8C1] bg-[#FFF3F4] px-5 py-3 text-sm font-semibold text-[#A73D52]"><Plus className="size-4" /> New Project</Link><Link href="/app/compose" className="inline-flex items-center gap-2 rounded-full bg-[#D95B72] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(217,91,114,.22)]"><SquarePen className="size-4" /> Compose</Link></div>
       </header>
 
-      <section aria-label="Workspace summary" className="mt-9 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section aria-label="Workspace summary" className="mt-9 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <Link href="/app/inbox" className="rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-6 shadow-[0_14px_42px_rgba(24,58,90,.06)] transition hover:-translate-y-0.5"><span className="grid size-10 place-items-center rounded-2xl bg-[#FFF3F4] text-[#D95B72]"><Inbox className="size-5" /></span><p className="mt-5 text-3xl font-semibold tracking-[-.04em] text-[#183A5A]">{unreadCount ?? 0}</p><p className="mt-1 text-sm text-[#64748B]">Unread thread{unreadCount === 1 ? "" : "s"}</p></Link>
         <Link href="/app/projects" className="rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-6 shadow-[0_14px_42px_rgba(24,58,90,.06)] transition hover:-translate-y-0.5"><span className="grid size-10 place-items-center rounded-2xl bg-[#FFF3F4] text-[#D95B72]"><FolderKanban className="size-5" /></span><p className="mt-5 text-3xl font-semibold tracking-[-.04em] text-[#183A5A]">{activeProjectCount ?? 0}</p><p className="mt-1 text-sm text-[#64748B]">Active Project{activeProjectCount === 1 ? "" : "s"}</p></Link>
         <div className="rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-6 shadow-[0_14px_42px_rgba(24,58,90,.06)]"><span className="grid size-10 place-items-center rounded-2xl bg-[#FFF3F4] text-[#D95B72]"><MailCheck className="size-5" /></span><p className="mt-5 text-3xl font-semibold tracking-[-.04em] text-[#183A5A]">{usableIdentities.length}</p><p className="mt-1 text-sm text-[#64748B]">Verified sender{usableIdentities.length === 1 ? "" : "s"}</p></div>
         <Link href="/app/scheduled" className="rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-6 shadow-[0_14px_42px_rgba(24,58,90,.06)] transition hover:-translate-y-0.5"><span className="grid size-10 place-items-center rounded-2xl bg-[#FFF3F4] text-[#D95B72]"><CalendarClock className="size-5" /></span><p className="mt-5 text-3xl font-semibold tracking-[-.04em] text-[#183A5A]">{scheduledCount ?? 0}</p><p className="mt-1 text-sm text-[#64748B]">Scheduled email{scheduledCount === 1 ? "" : "s"}</p>{nextScheduled && <p className="mt-3 truncate text-xs text-[#A73D52]">Next: {nextScheduled.subject}</p>}</Link>
+        <Link href="/app/jobs/saved" className="rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-6 shadow-[0_14px_42px_rgba(24,58,90,.06)] transition hover:-translate-y-0.5"><span className="grid size-10 place-items-center rounded-2xl bg-[#FFF3F4] text-[#D95B72]"><BriefcaseBusiness className="size-5" /></span><p className="mt-5 text-3xl font-semibold tracking-[-.04em] text-[#183A5A]">{savedJobsCount ?? 0}</p><p className="mt-1 text-sm text-[#64748B]">Saved job{savedJobsCount === 1 ? "" : "s"}</p></Link>
       </section>
 
       <div className="mt-8 grid min-w-0 gap-8 xl:grid-cols-[1.15fr_.85fr]">
@@ -74,6 +79,8 @@ export default async function DashboardPage() {
           {projects?.length ? <div className="mt-5 space-y-3">{projects.map((project) => <Link key={project.id} href={`/app/projects/${project.id}`} className="block rounded-2xl border border-[#E8E2E3] p-4 transition hover:border-[#E7B8C1] hover:bg-[#FFF3F4]"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate text-sm font-semibold text-[#183A5A]">{project.name}</h3><p className="mt-1 text-xs text-[#64748B]">{projectTypeLabels[project.type as ProjectType]}</p></div><span className="rounded-full bg-[#F7DDE1] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[.08em] text-[#A73D52]">{projectStatusLabels[project.status as ProjectStatus]}</span></div></Link>)}</div> : <div className="mt-6 rounded-2xl bg-[#FFF3F4] p-5"><p className="text-sm font-semibold text-[#183A5A]">No Projects yet</p><p className="mt-1 text-sm leading-6 text-[#64748B]">Create a Project when outreach needs shared context.</p><Link href="/app/projects/new" className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#A73D52]">Create Project <ArrowRight className="size-4" /></Link></div>}
         </section>
       </div>
+
+      <section className="mt-8 rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-5 shadow-[0_14px_42px_rgba(24,58,90,.06)] sm:p-7"><div className="flex items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-[.18em] text-[#D95B72]">Opportunities</p><h2 className="mt-1 text-xl font-semibold text-[#183A5A]">Recently saved jobs</h2></div><Link href="/app/jobs" className="text-sm font-semibold text-[#A73D52]">Search Jobs</Link></div>{recentJobs?.length ? <div className="mt-5 grid gap-3 md:grid-cols-3">{recentJobs.map((job) => <Link key={job.id} href={`/app/jobs/saved/${job.id}`} className="min-w-0 rounded-2xl border border-[#E8E2E3] p-4 transition hover:border-[#E7B8C1] hover:bg-[#FFF3F4]"><p className="break-words text-sm font-semibold text-[#183A5A]">{job.title}</p><p className="mt-1 truncate text-xs text-[#64748B]">{job.company_name}{job.location_text ? ` · ${job.location_text}` : ""}</p></Link>)}</div> : <div className="mt-5 rounded-2xl bg-[#FFF3F4] p-5"><p className="text-sm font-semibold text-[#183A5A]">No saved opportunities yet</p><p className="mt-1 text-sm leading-6 text-[#64748B]">Real jobs you save will appear here.</p></div>}</section>
 
       <section className="mt-8 rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-5 shadow-[0_14px_42px_rgba(24,58,90,.06)] sm:p-7">
         <p className="text-xs font-semibold uppercase tracking-[.18em] text-[#D95B72]">Project activity</p><h2 className="mt-1 text-xl font-semibold text-[#183A5A]">Recent context changes</h2>

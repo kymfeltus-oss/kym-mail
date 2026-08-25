@@ -6,7 +6,7 @@ Deterministic application logic owns state, validation, workflow progression, pe
 
 The required future flow is: input contract → deterministic validation → AI execution → structured response → schema validation → provenance validation → business-rule validation → persisted derived result. A `prompt → response → UI` design is prohibited.
 
-Data has three conceptual layers. **Authoritative data** contains human-controlled facts and operational records and cannot be directly modified by AI. **Derived intelligence** contains validated AI-assisted interpretations and must retain provenance to supporting authoritative records. **Presentation** contains regenerable copy or views and never becomes the factual source of truth. Gates 1–4 persist authoritative owner, mail, Project, and scheduling records; derived intelligence remains documented but unimplemented.
+Data has three conceptual layers. **Authoritative data** contains human-controlled facts and operational records and cannot be directly modified by AI. **Derived intelligence** contains validated AI-assisted interpretations and must retain provenance to supporting authoritative records. **Presentation** contains regenerable copy or views and never becomes the factual source of truth. Gates 1–5 persist authoritative owner, mail, Project, scheduling, and source-backed JobOpportunity records; derived intelligence remains documented but unimplemented.
 
 Next.js route/server boundaries own transport and rendering. Domain code owns business concepts and provider contracts. Supabase owns managed PostgreSQL and authentication. UI components do not query the database directly. Future providers implement the small domain interfaces and are injected into domain services. State transitions remain deterministic and persisted before presentation.
 
@@ -20,7 +20,13 @@ Gate 3 implements one owner-scoped `projects` model as an optional contextual la
 
 Threads and messages have nullable application-owned Project associations. A linked thread is the authoritative continuity mechanism: later messages and incoming replies inherit the existing thread's Project without changing provider identifiers or duplicating mail. A small deterministic activity log records only persisted creation, update, status, send, and reply events. Archive is the owner-facing deletion policy; permanent deletion is intentionally absent.
 
-The unimplemented Job Search → Career Match → Decision Maker → Email Intelligence → Individualized Outreach roadmap remains in [future-career-outreach-workflow.md](future-career-outreach-workflow.md). Future shared services consume validated Project context; they must not create Project-specific copies of Mail, Compose, Job Search, Contacts, Email Discovery, Resume Studio, or AI systems.
+Gate 5 implements the first step of the locked Job Search → Career Match → Decision Maker → Email Intelligence → Individualized Outreach roadmap in [future-career-outreach-workflow.md](future-career-outreach-workflow.md). Career Match and every downstream capability remain unimplemented. Shared services consume validated Project context; they do not create Project-specific copies of Mail, Compose, Job Search, Contacts, Email Discovery, Resume Studio, or AI systems.
+
+## Real job discovery
+
+Gate 5 adds a vendor-neutral `JobSearchProvider` and one Adzuna adapter. A deterministic service validates the owner query, preserves the original text, normalizes quoted phrases/terms, maps only supported filters, calls the provider server-side, validates each response record, strips provider HTML to plain text, deduplicates by provider identity/source URL/conservative fingerprint, and calculates explainable matched-term indicators. Provider payloads never become the application domain model, and raw response blobs are not persisted.
+
+Search results remain ephemeral until the owner saves one. Saving re-runs the provider request and resolves the provider job ID on the server, preventing a client-authored listing from becoming authoritative. One `job_opportunities` record is unique per owner/provider/provider-job ID and may associate with multiple active `JOB_SEARCH` Projects through `job_opportunity_projects`. Saved/Archived is the complete Gate 5 lifecycle. Search is global; a Project only supplies editable initial controls and persisted association context.
 
 ## Scheduled delivery
 

@@ -1,6 +1,6 @@
 # Providers
 
-`src/domain/providers` contains deliberately small `MailProvider` and `AIProvider` contracts. Gate 2 implements the mail contract in `src/integrations/google/google-mail-provider.ts`; the AI contract remains unimplemented.
+`src/domain/providers` contains deliberately small `MailProvider`, `JobSearchProvider`, and `AIProvider` contracts. Gate 2 implements the mail contract in `src/integrations/google/google-mail-provider.ts`; Gate 5 implements job discovery in `src/integrations/adzuna/adzuna-job-search-provider.ts`; the AI contract remains unimplemented.
 
 Vendor adapters belong outside domain logic and implement these contracts. Domain services receive a provider implementation rather than importing Google APIs directly. The Google adapter owns token refresh, profile/send-as discovery, message/history reads, sends, attachment downloads, and Gmail watch creation. It translates provider failures into safe application errors and marks a connection `reauth_required` when refresh cannot recover.
 
@@ -9,3 +9,13 @@ One `mail_connections` record represents the connected Google mailbox. Multiple 
 OAuth uses the minimum Gate 2 scope, `gmail.modify`, and a signed state value bound to the owner and connection. Credentials are encrypted at rest in the server-only credential table. Gmail push uses a Pub/Sub watch, authenticated push subscription, deduplicated notification persistence, and incremental history synchronization. Initial reconciliation is bounded to 30 days and only imports mail involving a configured KYM identity; history gaps fall back to the same bounded reconciliation. A watch is renewed when less than 24 hours remain.
 
 Scheduled delivery uses the same Google adapter and OAuth/token-refresh path as immediate sends. The provider accepts an application-generated RFC Message-ID and optional existing thread/reply identifiers. Before each retry, the executor searches Gmail for that stable Message-ID; an already accepted message is synchronized and finalized instead of sent again. Revoked authorization is translated to `REAUTHORIZATION_REQUIRED`, an unavailable sender fails without substitution, permanent provider/content failures stop, and only transient network/408/429/5xx failures receive a bounded retry. No custom SMTP, queue, or scheduled-mail provider implementation exists.
+
+## Job Search provider
+
+Gate 5 selects [Adzuna](https://developer.adzuna.com/) for V1 because its permitted API covers U.S. listings and exposes keyword/location search, recent-posted filtering, full-time/part-time/contract/permanent flags, minimum salary, pagination, company, location, dates, and source redirect URLs. Only Adzuna-specific request/response behavior lives in the adapter; the UI, Projects, APIs, and persistence depend on `JobSearchProvider` and normalized `NormalizedJob` records.
+
+The standard API returns a description snippet rather than the full source posting. KYM Mail labels it **Available description** and keeps **View Original Posting** authoritative. Provider-predicted salaries are not displayed or persisted as listing compensation. Work-arrangement inference is limited to explicit Remote/Hybrid wording; Onsite is never inferred from silence. Company and seniority controls are not exposed because the selected standard endpoint does not support them reliably as independent filters.
+
+Adzuna credentials are `ADZUNA_APP_ID` and `ADZUNA_APP_KEY`, server-only. The [published terms](https://developer.adzuna.com/docs/terms_of_service) require Jobs by Adzuna attribution and define default limits of 25 calls/minute, 250/day, 1,000/week, and 2,500/month. The current adapter performs one provider call per search/page and a second verification call when saving. Rate-limit, timeout, authentication, malformed JSON, and malformed-record failures become safe KYM Mail domain errors; fake fallback results are prohibited. A replacement provider implements the same contract and mapping without changing JobOpportunity, Project, or Jobs UI code.
+
+The bundled `public/adzuna-logo.svg` is Adzuna's official press asset and is used only to satisfy the provider's required listing attribution.

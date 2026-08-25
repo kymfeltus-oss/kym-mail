@@ -19,6 +19,11 @@ const schedulerEnvSchema = z.object({
   CRON_SECRET: z.string().min(32)
 });
 
+const jobSearchEnvSchema = z.object({
+  ADZUNA_APP_ID: z.string().trim().min(2),
+  ADZUNA_APP_KEY: z.string().trim().min(8)
+});
+
 const googleMailEnvSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().min(10),
   GOOGLE_CLIENT_SECRET: z.string().min(10),
@@ -66,6 +71,12 @@ export function getSupabaseAdminEnv(input: Record<string, string | undefined> = 
 export function getSchedulerEnv(input: Record<string, string | undefined> = process.env) {
   const result = schedulerEnvSchema.safeParse(input);
   if (!result.success) throw new ConfigurationError("Scheduled delivery is not configured.");
+  return result.data;
+}
+
+export function getJobSearchEnv(input: Record<string, string | undefined> = process.env) {
+  const result = jobSearchEnvSchema.safeParse(input);
+  if (!result.success) throw new ConfigurationError("Job Search is not configured.");
   return result.data;
 }
 
