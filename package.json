@@ -13,7 +13,8 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "career:import": "node --experimental-strip-types scripts/import-career-profile.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",

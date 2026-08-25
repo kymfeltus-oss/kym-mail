@@ -17,6 +17,7 @@ Thumbs.db
 /.vercel
 *.tsbuildinfo
 /supabase/.temp/
+/tmp/
 
 # credentials must never enter the repository
 client_secret_*.json

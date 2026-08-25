@@ -1,8 +1,8 @@
 # KYM Mail
 
-KYM Mail is a private email and career-outreach application. This independent repository contains the verified Gate 1 foundation, Gate 2 Mail Core, Gate 3 Projects layer, Gate 4 scheduling, and the Gate 5 Job Search implementation: real Supabase authentication, an owner-scoped unified mailbox, Google OAuth, Gmail synchronization, compose/send/reply, attachments, two verified sending identities, contextual Projects, deterministic scheduled delivery, real Adzuna job discovery, Saved Jobs, and persisted Job Search Project associations.
+KYM Mail is a private email and career-outreach application. This independent repository contains the verified Gate 1 foundation through Gate 5 Job Search plus the Gate 6 authoritative Master Career Profile: real Supabase authentication, an owner-scoped unified mailbox, contextual Projects, deterministic scheduled delivery, real Adzuna job discovery, Saved Jobs, and normalized source-backed career facts with provenance.
 
-AI, Career Match, career intelligence, contact discovery, resume functionality, recurring/campaign delivery, automated job monitoring/applications, and outreach automation remain outside Gate 5.
+AI, Career Match, contact discovery, resume generation/tailoring, recurring job monitoring, automated applications, and downstream outreach orchestration remain outside Gate 6.
 
 ## Canonical environments
 
@@ -20,6 +20,8 @@ This directory is the KYM Mail repository boundary. It is not part of the unrela
 2. Create a Supabase project, apply all migrations in `supabase/migrations` in filename order, and create the single owner in Supabase Authentication.
 3. Copy `.env.example` to `.env.local` and fill in the Supabase, server-only Google Mail, scheduler, and Adzuna values. Adzuna credentials come from [developer.adzuna.com](https://developer.adzuna.com/) and must remain server-only. Never commit `.env` files, OAuth/client/API secrets, service-role keys, token-encryption keys, downloaded credential JSON, or platform metadata.
 4. Run `npm run dev`, then open `http://localhost:3000`.
+
+Career imports are an owner-approved administrative operation. Validate an intake manifest and run `npm run career:import -- <path>` only with the server-only service-role environment configured. Intake manifests and source resumes are not application assets and must not be committed.
 
 Quality commands: `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, and `npm audit`.
 
