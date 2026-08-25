@@ -3,6 +3,22 @@ import { resumeContentSchema, type EvidenceRef, type ResumeContent } from "@/lib
 
 function ref(type: EvidenceRef["type"], id: string): EvidenceRef { return { type, id }; }
 
+export function mergeScopedRegeneration(generated: ResumeContent, prior: ResumeContent | undefined, scope: ResumeGenerationInput["scope"]) {
+  if (!prior || !scope || scope.type === "ENTIRE") return resumeContentSchema.parse(generated);
+  if (scope.type === "SUMMARY") {
+    return resumeContentSchema.parse({ ...prior, candidate: generated.candidate, target: generated.target, summary: generated.summary });
+  }
+  const replacement = [...generated.experiences.flatMap((item) => item.bullets), ...generated.projects.flatMap((item) => item.bullets)].find((item) => item.key === scope.contentKey);
+  if (!replacement) return resumeContentSchema.parse(prior);
+  return resumeContentSchema.parse({
+    ...prior,
+    candidate: generated.candidate,
+    target: generated.target,
+    experiences: prior.experiences.map((experience) => ({ ...experience, bullets: experience.bullets.map((bullet) => bullet.key === replacement.key ? replacement : bullet) })),
+    projects: prior.projects.map((project) => ({ ...project, bullets: project.bullets.map((bullet) => bullet.key === replacement.key ? replacement : bullet) }))
+  });
+}
+
 export class DeterministicResumeGenerationProvider implements ResumeGenerationProvider {
   readonly key = "deterministic-gate8-v1";
   readonly mode = "DETERMINISTIC" as const;
@@ -43,15 +59,6 @@ export class DeterministicResumeGenerationProvider implements ResumeGenerationPr
       education: career.education.map((item) => ({ educationId: item.id, degree: item.degree, fieldOfStudy: item.fieldOfStudy, institution: item.institution, completedOn: item.completedOn })),
       credentials: career.credentials.map((item) => ({ credentialId: item.id, name: item.name, status: item.status }))
     };
-    if (input.priorContent && input.scope?.type === "SUMMARY") content.summary = input.priorContent.summary;
-    if (input.priorContent && input.scope?.type === "BULLET" && input.scope.contentKey) {
-      const priorBlock = [...input.priorContent.experiences.flatMap((item) => item.bullets), ...input.priorContent.projects.flatMap((item) => item.bullets)].find((item) => item.key === input.scope?.contentKey);
-      if (priorBlock) {
-        for (const experience of content.experiences) experience.bullets = experience.bullets.map((item) => item.key === priorBlock.key ? priorBlock : item);
-        for (const project of content.projects) project.bullets = project.bullets.map((item) => item.key === priorBlock.key ? priorBlock : item);
-      }
-    }
-    return resumeContentSchema.parse(content);
+    return mergeScopedRegeneration(content, input.priorContent, input.scope);
   }
 }
-
