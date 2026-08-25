@@ -27,4 +27,4 @@ Quality commands: `npm run lint`, `npm run typecheck`, `npm test`, `npm run buil
 
 During local UI development, the temporary server-only auth bypass can be enabled with `KYM_DEV_AUTH_BYPASS=true`; see `docs/security.md`. It is forcibly disabled in production and does not change database RLS.
 
-See [architecture](docs/architecture.md), [database](docs/database.md), [providers](docs/providers.md), [security](docs/security.md), [testing](docs/testing.md), [deployment](docs/deployment.md), [handover](docs/handover.md), and the [locked future career-outreach architecture](docs/future-career-outreach-workflow.md). That roadmap distinguishes the implemented Gate 3 Project context from later unimplemented workflows.
+See [architecture](docs/architecture.md), [database](docs/database.md), [providers](docs/providers.md), [security](docs/security.md), [testing](docs/testing.md), [deployment](docs/deployment.md), [handover](docs/handover.md), and the [locked future career-outreach architecture](docs/future-career-outreach-workflow.md). That roadmap distinguishes implemented workflow gates from provider-dependent and future outreach work.

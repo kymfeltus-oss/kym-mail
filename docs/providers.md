@@ -23,3 +23,7 @@ The bundled `public/adzuna-logo.svg` is Adzuna's official press asset and is use
 ## Job analysis provider
 
 Gate 7 injects `JobAnalysisProvider`. V1 uses `DeterministicJobAnalysisProvider`, which extracts structured requirements from the stored job description and ranks candidate Master Career Profile evidence. It never assigns match state, the overall percentage, or persistence. Structured output is Zod-validated, original requirement wording must appear in the job description, and evidence IDs must resolve to loaded Gate 6 records. A future LLM adapter can implement the same contract; application logic still owns scoring, `NO_MATCH` versus `UNVERIFIED`, material gaps, and stale/re-analysis rules.
+
+## Contact-intelligence providers
+
+Gate 9 defines replaceable people-discovery, business-email-discovery, and email-verification contracts. No real contact provider is currently configured, so the registry returns no adapters and the UI truthfully reports that discovery is unavailable. Automated fixtures exist only in unit tests and cannot create production contacts. A future adapter must use server-only credentials, return source-backed structured records, map vendor states into KYM Mail enums, obey provider terms and cost limits, and pass organization, identity, email, and provenance validation before persistence. Pattern-inferred emails require at least two provider-backed convention observations and remain `UNVERIFIED` until a configured verifier returns an outreach-ready result.

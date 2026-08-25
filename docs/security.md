@@ -14,6 +14,8 @@ Master Career Profile tables are owner-readable and client read-only. Authentica
 
 Job-match analyses are owner-only. `job_analyses`, `job_analysis_requirements`, and `job_analysis_evidence` use owner RLS with no anonymous policy. Analysis APIs resolve the session on the server, require same-origin mutations, and log job/analysis identifiers and failure codes rather than job-description or career-profile content. Evidence rows must reference career records owned by the same owner.
 
+Gate 9 contact routes resolve the owner and saved job on the server, enforce same-origin mutations, and never accept a client owner ID or company override. Provider credentials and raw payloads are not exposed to the client or persisted wholesale. The schema stores only professional identity, role, organization, professional profile, business-email evidence, and bounded provenance; it excludes home addresses, demographics, and phone numbers. Manual entries are permanently attributed to `USER_ENTERED`, and manual email remains `UNVERIFIED`. RLS plus owner-consistency triggers prevent anonymous or cross-owner enumeration of organizations, searches, contacts, sources, and emails.
+
 ## Temporary local authentication bypass
 
 `KYM_DEV_AUTH_BYPASS=true` enables a development-only owner context. The authoritative check requires `NODE_ENV` to be non-production; production ignores the flag even if it is set. The resolver uses `KYM_DEV_OWNER_EMAIL` to find the existing owner and a server-only `SUPABASE_SERVICE_ROLE_KEY` to read through the same data client interface. Neither value enters the client bundle. The bypass has no rendered UI, badge, banner, or product-facing indicator; a structured server log is the only diagnostic.

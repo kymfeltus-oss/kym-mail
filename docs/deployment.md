@@ -26,6 +26,8 @@ Gate 5 also requires server-only `ADZUNA_APP_ID` and `ADZUNA_APP_KEY` values in 
 
 Gate 8 adds no external AI secret or resume-storage bucket. The configured deterministic provider reads the owner-scoped Gate 6/7 records through the authenticated server boundary. DOCX and PDF files are created on demand by a Node.js route, returned with private/no-store headers, and not persisted as public files. Apply migration `202608250013_tailored_resume_engine.sql` before deploying the Gate 8 routes. If a future AI provider is added, its key must remain server-only and its structured output must pass the same factual validator before persistence.
 
+Gate 9 requires migration `202608250014_contact_intelligence.sql`. It currently requires no new secret because no real people, email-discovery, or verification adapter is registered. Do not add a provider key alone and call the workflow configured: the matching server adapter, vendor terms, response validation, normalized status mapping, quota policy, and live acceptance must all be complete. Any future provider credential belongs only in `.env.local` and the Vercel encrypted environment store and must never use a `NEXT_PUBLIC_` name.
+
 For local development only, set `KYM_DEV_AUTH_BYPASS=true`, `KYM_DEV_OWNER_EMAIL` to an existing private owner, and `SUPABASE_SERVICE_ROLE_KEY` to the server-only project key. Set the flag to `false` to test normal login. Vercel production always ignores the bypass flag because the application also requires `NODE_ENV !== "production"`; do not configure the service-role key in client-prefixed variables.
 
 ## Scheduled delivery operations

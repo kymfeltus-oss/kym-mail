@@ -30,13 +30,17 @@ Gate 3 implements one owner-scoped `projects` model as an optional contextual la
 
 Threads and messages have nullable application-owned Project associations. A linked thread is the authoritative continuity mechanism: later messages and incoming replies inherit the existing thread's Project without changing provider identifiers or duplicating mail. A small deterministic activity log records only persisted creation, update, status, send, and reply events. Archive is the owner-facing deletion policy; permanent deletion is intentionally absent.
 
-Gate 5 implements the first step of the locked Job Search → Career Match → Decision Maker → Email Intelligence → Individualized Outreach roadmap in [future-career-outreach-workflow.md](future-career-outreach-workflow.md). Gate 7 implements Career Match against saved jobs. Decision-maker research, email intelligence, resume presentation, and outreach remain unimplemented. Shared services consume validated Project context; they do not create Project-specific copies of Mail, Compose, Job Search, Contacts, Email Discovery, Resume Studio, or AI systems.
+Gate 5 implements the first step of the locked Job Search → Career Match → Decision Maker → Email Intelligence → Individualized Outreach roadmap in [future-career-outreach-workflow.md](future-career-outreach-workflow.md). Gate 7 implements Career Match, Gate 8 implements truthful tailored resumes, and Gate 9 implements the contact-intelligence foundation. Real contact-provider discovery remains unavailable until legitimate people, email, and verification adapters are configured. Outreach remains unimplemented. Shared services consume validated Project context; they do not create Project-specific copies of Mail, Compose, Job Search, Contacts, Email Discovery, Resume Studio, or AI systems.
 
 ## Real job discovery
 
 Gate 5 adds a vendor-neutral `JobSearchProvider` and one Adzuna adapter. A deterministic service validates the owner query, preserves the original text, normalizes quoted phrases/terms, maps only supported filters, calls the provider server-side, validates each response record, strips provider HTML to plain text, deduplicates by provider identity/source URL/conservative fingerprint, and calculates explainable matched-term indicators. Provider payloads never become the application domain model, and raw response blobs are not persisted.
 
 Search results remain ephemeral until the owner saves one. Saving re-runs the provider request and resolves the provider job ID on the server, preventing a client-authored listing from becoming authoritative. One `job_opportunities` record is unique per owner/provider/provider-job ID and may associate with multiple active `JOB_SEARCH` Projects through `job_opportunity_projects`. Saved/Archived is the complete Gate 5 lifecycle. Search is global; a Project only supplies editable initial controls and persisted association context.
+
+## Contact intelligence
+
+Gate 9 adds independent `PeopleDiscoveryProvider`, `EmailDiscoveryProvider`, and `EmailVerificationProvider` boundaries. Deterministic application logic resolves the saved-job organization, derives a bounded role strategy from the target job, validates provider records, rejects wrong-company people, normalizes email states, ranks contacts with an explainable 100-point model, deduplicates only on provider-backed or exact person/company identities, and persists field-level provenance. AI does not own identity, employment, email, verification, ranking, state, or preferred-contact selection. With no real provider adapter configured, production shows an explicit unavailable state and never substitutes fixtures.
 
 ## Scheduled delivery
 

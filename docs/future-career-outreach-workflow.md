@@ -1,6 +1,6 @@
 # Locked Project context and future career-outreach architecture
 
-> Status: Gate 5 implements real provider-backed Job Search, Saved Jobs, and Job Search Project associations. Career Intelligence, contacts, resumes, AI, and the remaining downstream career-outreach workflow are authoritative future roadmap only.
+> Status: Gates 5–8 implement real Job Search, Saved Jobs, Career Match, and truthful tailored resumes. Gate 9 implements the contact-intelligence architecture, persistence, security, review UI, manual entry, and preferred selection, but real people/email/verification providers are not configured and live discovery remains pending. Outreach generation and the remaining downstream workflow are authoritative future roadmap only.
 
 KYM Mail is not merely an email client and will not become a generic job board. Its approved future product sequence is:
 
