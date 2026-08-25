@@ -1,5 +1,5 @@
 import { AlignmentType, BorderStyle, Document, LevelFormat, Packer, Paragraph, TextRun } from "docx";
-import PDFDocument from "pdfkit";
+import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import type { ResumeContent } from "@/lib/resumes/types";
 import { formatResumeDate } from "@/lib/resumes/format";
 
@@ -45,33 +45,80 @@ export async function renderResumeDocx(content: ResumeContent) {
 }
 
 export async function renderResumePdf(content: ResumeContent) {
-  const document = new PDFDocument({ size: "LETTER", margins: { top: 32, right: 44, bottom: 32, left: 44 }, info: { Title: `${content.candidate.fullName} — Tailored Resume`, Author: content.candidate.fullName, Subject: `${content.target.jobTitle} at ${content.target.employer}` } });
-  const chunks: Buffer[] = [];
-  document.on("data", (chunk: Buffer) => chunks.push(chunk));
-  const complete = new Promise<Buffer>((resolve, reject) => { document.on("end", () => resolve(Buffer.concat(chunks))); document.on("error", reject); });
-  const ensure = (height: number) => { if (document.y + height > document.page.height - 34) document.addPage(); };
-  const heading = (text: string) => { ensure(28); document.moveDown(0.35).font("Helvetica-Bold").fontSize(9).fillColor(`#${ROSE}`).text(text.toUpperCase(), { characterSpacing: 0.8 }); document.moveTo(44, document.y + 2).lineTo(document.page.width - 44, document.y + 2).lineWidth(0.7).strokeColor(`#${ROSE}`).stroke(); document.moveDown(0.35); };
-  document.font("Helvetica-Bold").fontSize(17).fillColor(`#${NAVY}`).text(content.candidate.fullName, { align: "center" });
-  document.moveDown(0.15).font("Helvetica").fontSize(8.5).fillColor(`#${SLATE}`).text(content.candidate.headline, { align: "center" });
-  if (content.candidate.location) document.moveDown(0.1).fontSize(8).text(content.candidate.location, { align: "center" });
-  heading("Executive Summary"); document.font("Helvetica").fontSize(8.5).fillColor(`#${NAVY}`).text(content.summary.text, { lineGap: 1.3 });
+  const pdf = await PDFDocument.create();
+  pdf.setTitle(`${content.candidate.fullName} - Tailored Resume`);
+  pdf.setAuthor(content.candidate.fullName);
+  pdf.setSubject(`${content.target.jobTitle} at ${content.target.employer}`);
+  pdf.setCreator("KYM Mail");
+  pdf.setProducer("KYM Mail");
+  const regular = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const italic = await pdf.embedFont(StandardFonts.HelveticaOblique);
+  const navy = rgb(24 / 255, 58 / 255, 90 / 255);
+  const rose = rgb(217 / 255, 91 / 255, 114 / 255);
+  const slate = rgb(100 / 255, 116 / 255, 139 / 255);
+  const width = 612;
+  const height = 792;
+  const margin = 44;
+  const maxWidth = width - margin * 2;
+  let page: PDFPage = pdf.addPage([width, height]);
+  let y = height - 34;
+  const safeText = (value: string) => value.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"').replace(/[\u2013\u2014]/g, "-").replace(/\u2022/g, "-");
+  const wrap = (value: string, font: PDFFont, size: number, available = maxWidth) => {
+    const words = safeText(value).split(/\s+/);
+    const lines: string[] = [];
+    let line = "";
+    for (const word of words) {
+      const candidate = line ? `${line} ${word}` : word;
+      if (font.widthOfTextAtSize(candidate, size) <= available || !line) line = candidate;
+      else { lines.push(line); line = word; }
+    }
+    if (line) lines.push(line);
+    return lines;
+  };
+  const newPage = () => { page = pdf.addPage([width, height]); y = height - 34; };
+  const ensure = (needed: number) => { if (y - needed < 32) newPage(); };
+  const paragraph = (value: string, options: { font?: PDFFont; size?: number; color?: typeof navy; indent?: number; gap?: number; center?: boolean } = {}) => {
+    const font = options.font ?? regular;
+    const size = options.size ?? 8.1;
+    const indent = options.indent ?? 0;
+    const lines = wrap(value, font, size, maxWidth - indent);
+    const lineHeight = size + 2;
+    ensure(lines.length * lineHeight + (options.gap ?? 2));
+    for (const line of lines) {
+      const lineWidth = font.widthOfTextAtSize(line, size);
+      page.drawText(line, { x: options.center ? (width - lineWidth) / 2 : margin + indent, y, size, font, color: options.color ?? navy });
+      y -= lineHeight;
+    }
+    y -= options.gap ?? 2;
+  };
+  const heading = (value: string) => {
+    ensure(25); y -= 7;
+    page.drawText(value.toUpperCase(), { x: margin, y, size: 8.5, font: bold, color: rose });
+    y -= 4;
+    page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 0.7, color: rose });
+    y -= 11;
+  };
+  paragraph(content.candidate.fullName, { font: bold, size: 17, center: true, gap: 1 });
+  paragraph(content.candidate.headline, { size: 8.5, color: slate, center: true, gap: 0 });
+  if (content.candidate.location) paragraph(content.candidate.location, { size: 8, color: slate, center: true, gap: 1 });
+  heading("Executive Summary"); paragraph(content.summary.text, { size: 8.5, gap: 1 });
   heading("Core Skills");
-  for (const group of content.skillGroups) document.font("Helvetica-Bold").fontSize(8).fillColor(`#${NAVY}`).text(`${group.category[0]}${group.category.slice(1).toLowerCase()}: `, { continued: true }).font("Helvetica").fillColor(`#${SLATE}`).text(group.skills.map((item) => item.name).join(" • "), { lineGap: 0.7 });
+  for (const group of content.skillGroups) paragraph(`${group.category[0]}${group.category.slice(1).toLowerCase()}: ${group.skills.map((item) => item.name).join(" | ")}`, { size: 8, color: slate, gap: 0 });
   heading("Professional Experience");
   for (const experience of content.experiences) {
-    ensure(52); document.moveDown(0.2).font("Helvetica-Bold").fontSize(9).fillColor(`#${NAVY}`).text(experience.title ?? "Title not provided", { continued: true }).fillColor(`#${ROSE}`).text(` | ${experience.employer}`);
-    const dates = `${formatResumeDate(experience.startDate, experience.startPrecision)} – ${formatResumeDate(experience.endDate, experience.endPrecision, experience.isCurrent)}`;
-    document.font("Helvetica-Oblique").fontSize(7.5).fillColor(`#${SLATE}`).text(`${dates}${experience.client ? ` | Client: ${experience.client}` : ""}`);
-    for (const bullet of experience.bullets) { ensure(24); document.font("Helvetica").fontSize(8.1).fillColor(`#${NAVY}`).text(`•  ${bullet.text}`, { indent: 8, lineGap: 0.7 }); }
+    ensure(48); y -= 2;
+    paragraph(`${experience.title ?? "Title not provided"} | ${experience.employer}`, { font: bold, size: 9, gap: 0 });
+    const dates = `${formatResumeDate(experience.startDate, experience.startPrecision)} - ${formatResumeDate(experience.endDate, experience.endPrecision, experience.isCurrent)}`;
+    paragraph(`${dates}${experience.client ? ` | Client: ${experience.client}` : ""}`, { font: italic, size: 7.5, color: slate, gap: 1 });
+    for (const bullet of experience.bullets) paragraph(`- ${bullet.text}`, { size: 8, indent: 8, gap: 0 });
   }
   if (content.projects.length) {
     heading("Selected Projects");
-    for (const project of content.projects) { ensure(40); document.font("Helvetica-Bold").fontSize(9).fillColor(`#${NAVY}`).text(project.name); for (const bullet of project.bullets) document.font("Helvetica").fontSize(8.1).text(`•  ${bullet.text}`, { indent: 8, lineGap: 0.7 }); }
+    for (const project of content.projects) { ensure(40); paragraph(project.name, { font: bold, size: 9, gap: 0 }); for (const bullet of project.bullets) paragraph(`- ${bullet.text}`, { size: 8, indent: 8, gap: 0 }); }
   }
   heading("Education & Credentials");
-  for (const item of content.education) document.font("Helvetica-Bold").fontSize(8.2).fillColor(`#${NAVY}`).text(`${item.degree}${item.fieldOfStudy ? ` in ${item.fieldOfStudy}` : ""}`, { continued: true }).font("Helvetica").fillColor(`#${SLATE}`).text(` — ${item.institution}`);
-  for (const item of content.credentials) document.font("Helvetica-Bold").fontSize(8.2).fillColor(`#${NAVY}`).text(item.name, { continued: true }).font("Helvetica").fillColor(`#${SLATE}`).text(` — ${item.status[0]}${item.status.slice(1).toLowerCase()}`);
-  document.end();
-  return complete;
+  for (const item of content.education) paragraph(`${item.degree}${item.fieldOfStudy ? ` in ${item.fieldOfStudy}` : ""} - ${item.institution}`, { size: 8.2, gap: 0 });
+  for (const item of content.credentials) paragraph(`${item.name} - ${item.status[0]}${item.status.slice(1).toLowerCase()}`, { size: 8.2, gap: 0 });
+  return Buffer.from(await pdf.save());
 }
-

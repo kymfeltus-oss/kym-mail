@@ -10,7 +10,7 @@ Vercel and local development receive secrets only through environment stores. Do
 
 Major directories: `src/app` owns routes and server actions; `src/components` owns shared presentation; `src/domain` owns vendor-neutral contracts; `src/lib` owns auth, Supabase access, environment handling, errors, and logging; `supabase/migrations` owns schema history; `docs` explains operations and architectural law.
 
-Follow the README to run, test, and build. Deployment is standard Vercel plus independently managed Supabase migrations. Runtime dependencies are Next.js, React, Supabase SSR/client, Zod, Lucide icons, `docx`, and `pdfkit`. Tailwind and quality tooling are development dependencies.
+Follow the README to run, test, and build. Deployment is standard Vercel plus independently managed Supabase migrations. Runtime dependencies are Next.js, React, Supabase SSR/client, Zod, Lucide icons, `docx`, and `pdf-lib`. Tailwind and quality tooling are development dependencies.
 
 KYM Mail records multiple owner mail identities. `kym@kymmailapp.com` is the default professional/direct sender and `info@kymmailapp.com` is the general/business sender. They use the owner-controlled production domain because `kym.com` was unavailable. They are identities within one unified mailbox experience, not separate apps or authentication users. This mail-identity change does not by itself change the private owner's Supabase authentication email.
 
