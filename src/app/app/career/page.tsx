@@ -59,7 +59,7 @@ export default async function CareerProfilePage() {
     database.from("career_provenance").select("id", { count: "exact", head: true }).eq("owner_id", ownerId),
     database.from("career_fact_history").select("id, entity_type, changed_fields, change_source, changed_at").eq("owner_id", ownerId).order("changed_at", { ascending: false }).limit(5),
     database.from("career_source_extractions").select("id, source_identity, candidate_count, extraction_method, extracted_at, career_sources(label, content_sha256)").eq("owner_id", ownerId).eq("extraction_status", "SUCCEEDED").order("source_identity"),
-    database.from("career_candidate_facts").select("id, group_key, normalized_claim, extracted_value, source_reference, classification, status, review_reason, career_sources(label, intake_identity)").eq("owner_id", ownerId).in("status", ["NEEDS_REVIEW", "CONFLICT"]).order("created_at"),
+    database.from("career_candidate_facts").select("id, group_key, normalized_claim, extracted_value, source_reference, classification, status, review_reason, career_sources(label, intake_identity)").eq("owner_id", ownerId).neq("status", "REJECTED").order("created_at"),
     database.from("career_facts").select("id, fact_type, current_value, status, confirmation_method, version_number").eq("owner_id", ownerId).order("last_changed_at", { ascending: false }),
     database.from("career_fact_versions").select("id, career_fact_id, version_number, previous_value, new_value, change_source, reason, changed_at").eq("owner_id", ownerId).order("changed_at", { ascending: false }).limit(12),
   ]);
@@ -83,7 +83,9 @@ export default async function CareerProfilePage() {
   const experienceOptions = experiences.map((item) => ({ label: `${titleNames.get(item.title_id ?? "") ?? "Earlier role"} · ${organizationNames.get(item.organization_id) ?? "Organization"}`, value: item.id }));
   const accomplishmentOptions = accomplishments.map((item) => ({ label: item.statement.slice(0, 90), value: item.id }));
   const extractions = (extractionsResult.data ?? []) as unknown as SourceExtraction[];
-  const reviewCandidates = (candidatesResult.data ?? []) as unknown as CareerReviewCandidate[];
+  const allCandidates = (candidatesResult.data ?? []) as unknown as CareerReviewCandidate[];
+  const reviewGroupKeys = new Set(allCandidates.filter((candidate) => candidate.status === "NEEDS_REVIEW" || candidate.status === "CONFLICT").map((candidate) => candidate.group_key));
+  const reviewCandidates = allCandidates.filter((candidate) => reviewGroupKeys.has(candidate.group_key));
   const facts = (factsResult.data ?? []) as CareerFact[];
   const autoConfirmedFacts = facts.filter((fact) => fact.confirmation_method === "AUTO_CONFIRMED_SOURCE_AGREEMENT");
   const ownerAddedFacts = facts.filter((fact) => fact.fact_type.startsWith("OWNER_") || (fact.current_value && typeof fact.current_value === "object" && "ownerConfirmedClaim" in fact.current_value));
