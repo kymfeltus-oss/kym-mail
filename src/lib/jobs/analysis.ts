@@ -180,7 +180,7 @@ const canonicalTerms: Record<string, string> = {
 
 const preferredPattern = /\b(preferred|desired|ideally|nice to have|a plus|bonus|advantageous)\b/i;
 const contextPattern = /\b(about us|our company|benefits|compensation|equal opportunity|eeo|accommodation|apply now|what we offer)\b/i;
-const notApplicablePattern = /\b(work authorization|authorized to work|visa sponsor|citizenship|equal opportunity|eeo|background check|drug (?:test|screen)|physical (?:demand|requirement)|reasonable accommodation|benefits include|salary range|compensation|relocation assistance|travel up to|weekends|overtime)\b/i;
+const notApplicablePattern = /\b(work authorization|authorized to work|visa sponsor|citizenship|equal opportunity|eeo|background check|drug (?:test|screen)|physical (?:demand|requirement)|reasonable accommodation|benefits include|life\s*&\s*add|403b|flexible spending account|paid time off|mandatory vaccination|covid-19 vaccinations?|salary range|compensation|relocation assistance|travel up to|weekends|overtime)\b/i;
 const responsibilityPattern = /\b(responsib|duties|oversee|lead|manage|develop|build|prepare|direct|drive|partner|own|ensure|coordinate|deliver|support|maintain|implement)\w*/i;
 const educationPattern = /\b(bachelor|master'?s|degree|b\.s\.|mba|education)\b/i;
 const certificationPattern = /\b(cpa|cma|cfa|cia|certif|license|licensed)\w*/i;
@@ -281,11 +281,14 @@ const CONCEPTS: ConceptDefinition[] = [
 export function detectNormalizedConcepts(text: string) {
   const haystack = normalizeAnalysisText(text).toLowerCase();
   const matches: Array<{ concept: string; aliasLength: number }> = [];
+  if (/\bbachelor'?s?\b/.test(haystack) && /\baccounting\b/.test(haystack)) {
+    matches.push({ concept: "bachelor-accounting", aliasLength: 100 });
+  }
   for (const item of CONCEPTS) {
     const aliasLength = item.aliases.reduce((best, alias) => haystack.includes(alias) ? Math.max(best, alias.length) : best, 0);
     if (aliasLength) matches.push({ concept: item.concept, aliasLength });
   }
-  return matches.sort((left, right) => right.aliasLength - left.aliasLength || left.concept.localeCompare(right.concept)).map((item) => item.concept);
+  return [...new Set(matches.sort((left, right) => right.aliasLength - left.aliasLength || left.concept.localeCompare(right.concept)).map((item) => item.concept))];
 }
 
 export function detectNormalizedConcept(text: string) {

@@ -206,6 +206,24 @@ describe("deterministic scoring", () => {
   it("throws when the career profile has no evidence", () => {
     expect(() => matchRequirements([requirement({ importance: "REQUIRED", category: "SKILL", originalText: "Python experience" })], [])).toThrow(/unavailable/i);
   });
+
+  it("treats the authoritative B.S. in Accounting as a direct bachelor's Accounting match", () => {
+    const [result] = matchRequirements(
+      [requirement({ importance: "REQUIRED", category: "EDUCATION", originalText: "Bachelor's degree in Accounting is required." })],
+      [evidence({ id: ids.degree, type: "EDUCATION", label: "Bachelor of Science (B.S.) · Accounting", text: "Bachelor of Science (B.S.) Accounting University of North Texas", metadata: { authorityStatus: "RESOLVED" } })]
+    );
+    expect(result.matchState).toBe("STRONG_MATCH");
+    expect(result.evidence).toHaveLength(1);
+  });
+
+  it("excludes employee benefits and vaccination policies from career scoring", () => {
+    const requirements = [
+      requirement({ importance: "REQUIRED", category: "INDUSTRY", originalText: "Life & ADD, 403B, Flexible Spending Account, Generous Paid Time off Program." }),
+      requirement({ sequenceNumber: 2, importance: "REQUIRED", category: "RESPONSIBILITY", originalText: "A mandatory vaccination policy requires COVID-19 vaccinations for all employees." })
+    ];
+    const results = matchRequirements(requirements, [evidence({ id: ids.profile, type: "PROFILE", label: "Finance leader", text: "Finance leader" })]);
+    expect(results.map((item) => item.matchState)).toEqual(["NOT_APPLICABLE", "NOT_APPLICABLE"]);
+  });
 });
 
 describe("end-to-end analysis with a bounded provider", () => {
