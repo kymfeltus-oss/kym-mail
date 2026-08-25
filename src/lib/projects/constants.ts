@@ -16,3 +16,25 @@ export const projectStatusLabels: Record<ProjectStatus, string> = {
   COMPLETED: "Completed",
   ARCHIVED: "Archived"
 };
+
+export const workArrangements = ["REMOTE", "HYBRID", "ONSITE"] as const;
+export type WorkArrangementPreference = (typeof workArrangements)[number];
+export const workArrangementLabels: Record<WorkArrangementPreference, string> = {
+  REMOTE: "Remote",
+  HYBRID: "Hybrid",
+  ONSITE: "Onsite"
+};
+
+export const seniorityLevels = ["MANAGER", "SENIOR_MANAGER", "DIRECTOR", "SENIOR_DIRECTOR", "VP", "C_SUITE"] as const;
+export type SeniorityLevel = (typeof seniorityLevels)[number];
+export const seniorityLevelLabels: Record<SeniorityLevel, string> = {
+  MANAGER: "Manager",
+  SENIOR_MANAGER: "Senior Manager",
+  DIRECTOR: "Director",
+  SENIOR_DIRECTOR: "Senior Director",
+  VP: "VP",
+  C_SUITE: "C-Suite"
+};
+
+export const PROJECT_COMPENSATION_MIN = 1;
+export const PROJECT_COMPENSATION_MAX = 10_000_000;

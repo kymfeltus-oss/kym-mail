@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getOwnerContext } from "@/lib/auth/owner-context";
-import { parseProjectUpdateInput, projectStatusSchema, projectTypes, type ProjectType } from "@/lib/projects/validation";
+import { parseProjectUpdateInput, projectStatusSchema, projectTypes, projectValidationErrorPayload, type ProjectType } from "@/lib/projects/validation";
 
 function sameOrigin(request: NextRequest) {
   const origin = request.headers.get("origin");
@@ -49,7 +49,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       .eq("is_active", true)
       .eq("send_as_state", "available")
       .maybeSingle();
-    if (identityError || !identity) return NextResponse.json({ error: "Select an available default sending identity." }, { status: 400 });
+    if (identityError || !identity) return NextResponse.json({ error: "Select an available default sending identity.", fieldErrors: { defaultMailAccountId: "Select an available default sending identity." } }, { status: 400 });
     const { error } = await owner.database.from("projects").update({
       name: input.name,
       objective: input.objective,
@@ -60,7 +60,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (error) return NextResponse.json({ error: "The Project could not be updated." }, { status: 503 });
     return NextResponse.json({ updated: true });
   } catch (error) {
-    if (error instanceof z.ZodError) return NextResponse.json({ error: error.issues[0]?.message ?? "Check the Project details." }, { status: 400 });
+    if (error instanceof z.ZodError) return NextResponse.json(projectValidationErrorPayload(error), { status: 400 });
     return NextResponse.json({ error: "The Project could not be updated." }, { status: 503 });
   }
 }

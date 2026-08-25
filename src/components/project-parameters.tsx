@@ -1,7 +1,4 @@
-import type { ProjectType } from "@/lib/projects/constants";
-
-const arrangementLabels: Record<string, string> = { REMOTE: "Remote", HYBRID: "Hybrid", ONSITE: "Onsite" };
-const seniorityLabels: Record<string, string> = { MANAGER: "Manager", SENIOR_MANAGER: "Senior Manager", DIRECTOR: "Director", SENIOR_DIRECTOR: "Senior Director", VP: "VP", C_SUITE: "C-Suite" };
+import { seniorityLevelLabels, workArrangementLabels, type ProjectType } from "@/lib/projects/constants";
 
 function text(value: unknown) { return typeof value === "string" ? value : ""; }
 function list(value: unknown) { return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []; }
@@ -13,10 +10,10 @@ export function ProjectParameters({ type, parameters }: { type: ProjectType; par
       { label: "Target roles", value: list(parameters.targetRoles) },
       { label: "Keywords / skills", value: list(parameters.keywords) },
       { label: "Location", value: text(parameters.locationText) || "Flexible" },
-      { label: "Work arrangement", value: list(parameters.arrangements).map((item) => arrangementLabels[item] ?? item) },
-      { label: "Seniority", value: list(parameters.seniority).map((item) => seniorityLabels[item] ?? item) }
+      { label: "Work arrangement", value: list(parameters.arrangements).map((item) => workArrangementLabels[item as keyof typeof workArrangementLabels] ?? item) },
+      { label: "Seniority", value: list(parameters.seniority).map((item) => seniorityLevelLabels[item as keyof typeof seniorityLevelLabels] ?? item) }
     );
-    if (typeof parameters.minimumCompensation === "number") rows.push({ label: "Minimum target compensation", value: new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(parameters.minimumCompensation) });
+    if (typeof parameters.minimumCompensation === "number") rows.push({ label: "Target annual compensation", value: new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(parameters.minimumCompensation) });
   } else if (type === "BUSINESS_OUTREACH") {
     rows.push({ label: "Target organization / industry", value: text(parameters.targetOrganizationNotes) }, { label: "Target contact roles", value: list(parameters.targetContactRoles) });
     if (text(parameters.talkingPoints)) rows.push({ label: "Messaging context / talking points", value: text(parameters.talkingPoints) });
