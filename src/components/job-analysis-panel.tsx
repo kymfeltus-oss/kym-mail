@@ -51,7 +51,7 @@ const categoryLabels: Record<RequirementCategory, string> = {
 
 function formatTimestamp(value: string | null | undefined) {
   if (!value) return null;
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Chicago" }).format(new Date(value));
 }
 
 function RequirementCard({ requirement }: { requirement: RequirementView }) {
