@@ -210,19 +210,36 @@ export async function discoverContacts(input: {
   providers: { people: PeopleDiscoveryProvider; email: EmailDiscoveryProvider | null; verification: EmailVerificationProvider | null };
 }) {
   const peopleResult = await input.providers.people.search({ organization: input.organization, targetRoles: input.targetRoles, limit: CONTACT_SEARCH_LIMIT });
-  const people = peopleResult.people.map((person) => discoveredPersonSchema.parse(person)).filter((person) => isOrganizationMatch(person, input.organization));
+  const organization = peopleResult.resolvedOrganization
+    ? { canonicalName: peopleResult.resolvedOrganization.canonicalName, domain: peopleResult.resolvedOrganization.domain, alternateNames: peopleResult.resolvedOrganization.alternateNames }
+    : input.organization;
+  const people = peopleResult.people.map((person) => discoveredPersonSchema.parse(person)).filter((person) => isOrganizationMatch(person, organization));
   const ranked: RankedContact[] = [];
+  const usage = {
+    people: peopleResult.usage,
+    email: { requests: 0, credits: 0 as number | null },
+    verification: { requests: 0, credits: 0 as number | null }
+  };
+  const addUsage = (target: { requests: number; credits: number | null }, value: { requests: number; credits: number | null }) => {
+    target.requests += value.requests;
+    target.credits = target.credits === null || value.credits === null ? null : target.credits + value.credits;
+  };
   let partial = !input.providers.email || !input.providers.verification;
   for (const person of people) {
     const emails: RankedContact["emails"] = [];
     if (input.providers.email) {
       try {
-        const result = await input.providers.email.findBusinessEmails({ person, organizationDomain: input.organization.domain });
+        const result = await input.providers.email.findBusinessEmails({ person, organizationDomain: organization.domain });
+        addUsage(usage.email, result.usage);
         for (const raw of result.emails) {
           const email = normalizeEmailCandidate(raw);
           let verification = null;
           if (input.providers.verification && !email.isPatternBased && email.status !== "INVALID") {
-            try { verification = verificationResultSchema.parse((await input.providers.verification.verify({ email: email.email })).result); }
+            try {
+              const verificationResponse = await input.providers.verification.verify({ email: email.email });
+              addUsage(usage.verification, verificationResponse.usage);
+              verification = verificationResultSchema.parse(verificationResponse.result);
+            }
             catch { partial = true; }
           }
           emails.push({ ...email, verification });
@@ -230,8 +247,8 @@ export async function discoverContacts(input: {
       } catch { partial = true; }
     }
     const bestStatus = emails.map((email) => email.verification?.status ?? email.status).sort((a, b) => emailScore(b) - emailScore(a))[0] ?? null;
-    const rank = rankContact(person, input.organization, input.targetRoles, bestStatus);
+    const rank = rankContact(person, organization, input.targetRoles, bestStatus);
     ranked.push({ ...person, classifications: rank.classifications, relevanceScore: rank.score, relevanceReasons: rank.reasons, dedupeKey: makeContactDedupeKey(person, emails.find((item) => item.verification && isOutreachReady(item.verification.status))?.email), emails, provenance: [person] });
   }
-  return { contacts: deduplicateRankedContacts(ranked), status: partial ? "PARTIAL" as const : "COMPLETE" as const, usage: { people: peopleResult.usage } };
+  return { contacts: deduplicateRankedContacts(ranked), resolvedOrganization: peopleResult.resolvedOrganization ?? null, status: partial ? "PARTIAL" as const : "COMPLETE" as const, usage };
 }

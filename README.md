@@ -1,8 +1,8 @@
 # KYM Mail
 
-KYM Mail is a private email and career-outreach application. This independent repository contains the Gate 1 foundation through Gate 8 Tailored Resume Engine: real Supabase authentication, an owner-scoped unified mailbox, contextual Projects, deterministic scheduled delivery, real Adzuna job discovery, Saved Jobs, the authoritative Master Career Profile, evidence-linked job-match analysis, and versioned factual resume generation with DOCX/PDF export.
+KYM Mail is a private email and career-outreach application. This independent repository contains the Gate 1 foundation through the Gate 9 Contact Intelligence foundation: real Supabase authentication, an owner-scoped unified mailbox, contextual Projects, deterministic scheduled delivery, real Adzuna job discovery, Saved Jobs, the authoritative Master Career Profile, evidence-linked job-match analysis, versioned factual resume generation with DOCX/PDF export, and owner-secured contact discovery, evidence, ranking, and preferred-contact persistence.
 
-Cover letters, contact discovery, automated applications, and downstream outreach orchestration remain outside Gate 8.
+The production Apollo organization/people/business-email adapter is implemented but remains disabled until `APOLLO_API_KEY` is configured and live-verified. Cover letters, automated applications, and downstream outreach orchestration remain future work.
 
 ## Canonical environments
 
@@ -18,7 +18,7 @@ This directory is the KYM Mail repository boundary. It is not part of the unrela
 
 1. Use Node.js 22 or newer and run `npm install`.
 2. Create a Supabase project, apply all migrations in `supabase/migrations` in filename order, and create the single owner in Supabase Authentication.
-3. Copy `.env.example` to `.env.local` and fill in the Supabase, server-only Google Mail, scheduler, and Adzuna values. Adzuna credentials come from [developer.adzuna.com](https://developer.adzuna.com/) and must remain server-only. Never commit `.env` files, OAuth/client/API secrets, service-role keys, token-encryption keys, downloaded credential JSON, or platform metadata.
+3. Copy `.env.example` to `.env.local` and fill in the Supabase, server-only Google Mail, scheduler, Adzuna, and—when enabling Gate 9 live contact discovery—Apollo values. Adzuna credentials come from [developer.adzuna.com](https://developer.adzuna.com/) and Apollo credentials from [Apollo API setup](https://docs.apollo.io/reference/apollo-api); both must remain server-only. Never commit `.env` files, OAuth/client/API secrets, service-role keys, token-encryption keys, downloaded credential JSON, or platform metadata.
 4. Run `npm run dev`, then open `http://localhost:3000`.
 
 Career imports are an owner-approved administrative operation. Validate an intake manifest and run `npm run career:import -- <path>` only with the server-only service-role environment configured. Intake manifests and source resumes are not application assets and must not be committed.

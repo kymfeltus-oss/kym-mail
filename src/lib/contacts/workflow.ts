@@ -25,7 +25,8 @@ async function loadSavedJob(database: SupabaseClient, ownerId: string, jobId: st
 export async function ensureJobOrganization(database: SupabaseClient, ownerId: string, job: SavedJob): Promise<OrganizationRow> {
   const { data: existing, error: readError } = await database.from("job_contact_organizations").select("id, canonical_name, domain, alternate_names, confidence, stale_at").eq("owner_id", ownerId).eq("job_opportunity_id", job.id).maybeSingle();
   if (readError) throw new ProviderUnavailableError("The job organization could not be resolved.");
-  if (existing && !existing.stale_at && normalizeOrganizationName(existing.canonical_name) === normalizeOrganizationName(job.company_name)) return existing as OrganizationRow;
+  const existingNames = existing ? [existing.canonical_name, ...(existing.alternate_names ?? [])].map(normalizeOrganizationName) : [];
+  if (existing && !existing.stale_at && existingNames.includes(normalizeOrganizationName(job.company_name))) return existing as OrganizationRow;
   const payload = {
     owner_id: ownerId,
     job_opportunity_id: job.id,
@@ -102,6 +103,20 @@ export async function runContactSearch(database: SupabaseClient, ownerId: string
   }
   try {
     const result = await discoverContacts({ organization: { canonicalName: organization.canonical_name, domain: organization.domain, alternateNames: organization.alternate_names ?? [] }, targetRoles, providers: { people: providers.people, email: providers.email, verification: providers.verification } });
+    if (result.resolvedOrganization) {
+      const { error: organizationError } = await database.from("job_contact_organizations").update({
+        canonical_name: result.resolvedOrganization.canonicalName,
+        domain: result.resolvedOrganization.domain,
+        alternate_names: result.resolvedOrganization.alternateNames,
+        source_type: "PEOPLE_PROVIDER",
+        source_provider: result.resolvedOrganization.providerKey,
+        source_record_id: result.resolvedOrganization.sourceRecordId,
+        confidence: result.resolvedOrganization.confidence,
+        resolved_at: new Date().toISOString(),
+        stale_at: null
+      }).eq("owner_id", ownerId).eq("id", organization.id);
+      if (organizationError) throw new ProviderUnavailableError("The resolved organization could not be stored.");
+    }
     const activeIds: string[] = [];
     for (const contact of result.contacts) {
       const { data: stored, error } = await database.from("job_contacts").upsert({
@@ -159,6 +174,10 @@ export async function runContactSearch(database: SupabaseClient, ownerId: string
           verification_refresh_after: email.verification?.refreshAfter ?? null
         }, { onConflict: "contact_id,email_address" });
         if (emailError) throw new ProviderUnavailableError("Discovered email evidence could not be stored.");
+        await insertSource(database, { ownerId, contactId: stored.id, sourceType: "EMAIL_PROVIDER", providerKey: email.providerKey, sourceRecordId: email.sourceRecordId, sourceUrl: null, fieldName: "email_address", claim: email.email, confidence: status === "VERIFIED" ? 95 : status === "DELIVERABLE" ? 90 : status === "LIKELY" ? 70 : 50, observedAt: email.discoveredAt });
+        if (email.verification) {
+          await insertSource(database, { ownerId, contactId: stored.id, sourceType: "VERIFICATION_PROVIDER", providerKey: email.verification.providerKey, sourceRecordId: email.sourceRecordId, sourceUrl: null, fieldName: "email_status", claim: email.verification.status, confidence: email.verification.status === "VERIFIED" || email.verification.status === "DELIVERABLE" ? 100 : 80, observedAt: email.verification.verifiedAt });
+        }
       }
     }
     const refreshAfter = new Date(Date.now() + 90 * 86_400_000).toISOString();

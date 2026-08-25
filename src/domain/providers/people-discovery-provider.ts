@@ -6,7 +6,21 @@ export type PeopleDiscoveryRequest = {
   limit: number;
 };
 
+export type ProviderResolvedOrganization = {
+  providerKey: string;
+  sourceRecordId: string;
+  canonicalName: string;
+  domain: string | null;
+  alternateNames: string[];
+  confidence: number;
+  sourceUrl: string | null;
+};
+
 export interface PeopleDiscoveryProvider {
   readonly key: string;
-  search(request: PeopleDiscoveryRequest): Promise<{ people: DiscoveredPerson[]; usage: { requests: number; credits: number | null } }>;
+  search(request: PeopleDiscoveryRequest): Promise<{
+    people: DiscoveredPerson[];
+    resolvedOrganization?: ProviderResolvedOrganization;
+    usage: { requests: number; credits: number | null };
+  }>;
 }

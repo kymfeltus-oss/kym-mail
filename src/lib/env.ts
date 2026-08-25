@@ -24,6 +24,10 @@ const jobSearchEnvSchema = z.object({
   ADZUNA_APP_KEY: z.string().trim().min(8)
 });
 
+const contactProviderEnvSchema = z.object({
+  APOLLO_API_KEY: z.string().trim().min(12)
+});
+
 const googleMailEnvSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().min(10),
   GOOGLE_CLIENT_SECRET: z.string().min(10),
@@ -78,6 +82,16 @@ export function getJobSearchEnv(input: Record<string, string | undefined> = proc
   const result = jobSearchEnvSchema.safeParse(input);
   if (!result.success) throw new ConfigurationError("Job Search is not configured.");
   return result.data;
+}
+
+export function getContactProviderEnv(input: Record<string, string | undefined> = process.env) {
+  const result = contactProviderEnvSchema.safeParse(input);
+  if (!result.success) throw new ConfigurationError("Contact intelligence provider is not configured.");
+  return result.data;
+}
+
+export function hasContactProviderEnv(input: Record<string, string | undefined> = process.env) {
+  return Boolean(input.APOLLO_API_KEY?.trim());
 }
 
 export function getGoogleMailEnv(input: Record<string, string | undefined> = process.env) {
