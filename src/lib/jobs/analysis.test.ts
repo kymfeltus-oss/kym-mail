@@ -219,10 +219,19 @@ describe("deterministic scoring", () => {
   it("excludes employee benefits and vaccination policies from career scoring", () => {
     const requirements = [
       requirement({ importance: "REQUIRED", category: "INDUSTRY", originalText: "Life & ADD, 403B, Flexible Spending Account, Generous Paid Time off Program." }),
-      requirement({ sequenceNumber: 2, importance: "REQUIRED", category: "RESPONSIBILITY", originalText: "A mandatory vaccination policy requires COVID-19 vaccinations for all employees." })
+      requirement({ sequenceNumber: 2, importance: "REQUIRED", category: "RESPONSIBILITY", originalText: "The company has implemented a mandatory vaccination policy requiring COVID-19 vaccinations for all employees." })
     ];
     const results = matchRequirements(requirements, [evidence({ id: ids.profile, type: "PROFILE", label: "Finance leader", text: "Finance leader" })]);
     expect(results.map((item) => item.matchState)).toEqual(["NOT_APPLICABLE", "NOT_APPLICABLE"]);
+  });
+
+  it("persists an explicit certification-not-held reason for an active CPA requirement matched only by candidacy", () => {
+    const [result] = matchRequirements(
+      [requirement({ importance: "REQUIRED", category: "CERTIFICATION", originalText: "Active CPA license required." })],
+      [evidence({ id: ids.cpa, type: "CREDENTIAL", label: "CPA Candidate", text: "CPA Candidate", metadata: { credentialStatus: "CANDIDATE", authorityStatus: "RESOLVED" } })]
+    );
+    expect(result.matchState).toBe("PARTIAL_MATCH");
+    expect(result.gapReason).toBe("CERTIFICATION_NOT_HELD");
   });
 });
 

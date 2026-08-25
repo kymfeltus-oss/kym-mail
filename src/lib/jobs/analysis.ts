@@ -181,6 +181,7 @@ const canonicalTerms: Record<string, string> = {
 const preferredPattern = /\b(preferred|desired|ideally|nice to have|a plus|bonus|advantageous)\b/i;
 const contextPattern = /\b(about us|our company|benefits|compensation|equal opportunity|eeo|accommodation|apply now|what we offer)\b/i;
 const notApplicablePattern = /\b(work authorization|authorized to work|visa sponsor|citizenship|equal opportunity|eeo|background check|drug (?:test|screen)|physical (?:demand|requirement)|reasonable accommodation|benefits include|life\s*&\s*add|403b|flexible spending account|paid time off|mandatory vaccination|covid-19 vaccinations?|salary range|compensation|relocation assistance|travel up to|weekends|overtime)\b/i;
+const hardNotApplicablePattern = /\b(equal opportunity|eeo|benefits include|life\s*&\s*add|403b|flexible spending account|paid time off|mandatory vaccination|covid-19 vaccinations?)\b/i;
 const responsibilityPattern = /\b(responsib|duties|oversee|lead|manage|develop|build|prepare|direct|drive|partner|own|ensure|coordinate|deliver|support|maintain|implement)\w*/i;
 const educationPattern = /\b(bachelor|master'?s|degree|b\.s\.|mba|education)\b/i;
 const certificationPattern = /\b(cpa|cma|cfa|cia|certif|license|licensed)\w*/i;
@@ -510,6 +511,7 @@ function unresolvedState(requirement: ExtractedRequirement): "NO_MATCH" | "UNVER
 
 function gapReasonFor(requirement: ExtractedRequirement, state: RequirementMatchState, bestScore: number): RequirementGapReason | null {
   if (state === "UNVERIFIED") return "UNVERIFIABLE";
+  if (state === "PARTIAL_MATCH" && requirement.category === "CERTIFICATION" && /\b(required|active|licensed|certified|must (?:hold|have))\b/i.test(requirement.originalText)) return "CERTIFICATION_NOT_HELD";
   if (state !== "NO_MATCH") return null;
   if (requirement.category === "CERTIFICATION") return "CERTIFICATION_NOT_HELD";
   if (requirement.category === "TECHNOLOGY" || requirement.category === "SYSTEM") return "TECHNOLOGY_ABSENT";
@@ -532,6 +534,7 @@ function explanationFor(requirement: ExtractedRequirement, state: RequirementMat
     if (gapReason === "YEARS_INSUFFICIENT") return "Authoritative experience exists but does not meet the stated years-of-experience requirement.";
     return "No authoritative Master Career Profile evidence supports this requirement.";
   }
+  if (state === "PARTIAL_MATCH" && gapReason === "CERTIFICATION_NOT_HELD") return `Candidate status is verified, but it does not establish the active credential required: ${evidence[0]?.evidence.label}.`;
   if (state === "PARTIAL_MATCH") return `Related evidence exists, but it does not fully establish the requirement: ${evidence[0]?.evidence.label}.`;
   if (state === "MATCH") return `Authoritative evidence supports this requirement through ${evidence[0]?.evidence.label}.`;
   return `Direct authoritative evidence strongly supports this requirement through ${evidence[0]?.evidence.label}.`;
@@ -559,7 +562,7 @@ export function matchRequirements(
 ) {
   if (!careerEvidence.length) throw new JobAnalysisInputError("CAREER_PROFILE_UNAVAILABLE", "The Master Career Profile is unavailable.");
   return requirements.map<MatchedRequirement>((requirement, index) => {
-    if (notApplicablePattern.test(requirement.originalText) && !responsibilityPattern.test(requirement.originalText) && !educationPattern.test(requirement.originalText) && !certificationPattern.test(requirement.originalText) && !technologyPattern.test(requirement.originalText) && !accountingPattern.test(requirement.originalText)) {
+    if (hardNotApplicablePattern.test(requirement.originalText) || (notApplicablePattern.test(requirement.originalText) && !responsibilityPattern.test(requirement.originalText) && !educationPattern.test(requirement.originalText) && !certificationPattern.test(requirement.originalText) && !technologyPattern.test(requirement.originalText) && !accountingPattern.test(requirement.originalText))) {
       return {
         ...requirement,
         matchState: "NOT_APPLICABLE",
