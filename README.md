@@ -23,6 +23,8 @@ This directory is the KYM Mail repository boundary. It is not part of the unrela
 
 Career imports are an owner-approved administrative operation. Validate an intake manifest and run `npm run career:import -- <path>` only with the server-only service-role environment configured. The authenticated owner may review and edit factual records in the Master Career Profile; every edit is forced to resolved authority and preserved in private immutable history. Intake manifests and source resumes are not application assets and must not be committed.
 
+Gate 6A adds the low-cost source-to-authority workflow around that profile. The two reviewed resume extractions are persisted once by source SHA-256; deterministic comparison creates candidate facts, auto-confirms only exact low-risk dual-source technology/system facts, and sends conflicts or unique claims to one owner-only Review Needed queue. Owner resolutions and edits create numbered fact versions and provenance. A later import may suggest a change but cannot silently replace `OWNER_CONFIRMED` data. Resume PDFs remain outside the repository and are never served by the app.
+
 Quality commands: `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, and `npm audit`.
 
 During local UI development, the temporary server-only auth bypass can be enabled with `KYM_DEV_AUTH_BYPASS=true`; see `docs/security.md`. It is forcibly disabled in production and does not change database RLS.

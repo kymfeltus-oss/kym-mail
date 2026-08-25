@@ -2,6 +2,8 @@
 
 KYM Mail contains the Gate 1 foundation through Gate 5 Job Search, the Gate 6 authoritative Master Career Profile, Gate 7 Career Match, and Gate 8 Tailored Resume Engine. It is a Next.js/React/TypeScript application with real Supabase authentication and RLS, unified mail, contextual Projects, deterministic scheduling, vendor-neutral job discovery, normalized Saved Jobs, structured source-backed career facts with field provenance, persisted evidence-linked job analyses, and validated versioned resume exports.
 
+Gate 6A is the source-intake and owner-review foundation for the Master Career Profile. It reuses the two already reviewed resume extraction records by SHA-256, persists candidates, performs deterministic comparison, auto-confirms only safe exact dual-source facts, and exposes one Review Needed queue for exceptions. Owner review/edit paths create immutable numbered fact versions and provenance; controlled imports cannot silently replace an owner-confirmed fact. No new AI provider or secret is required, and raw resumes must remain outside the repository and deployment.
+
 ## Ownership and service relationships
 
 The canonical source repository is `https://github.com/kymfeltus-oss/kym-mail`, and this project directory is its root. KYM Mail is intentionally isolated from the unrelated parent `Identification-Engine` repository and its history. Production is `https://www.kymmailapp.com` in the Vercel project `kym-mail`. Persistence and owner authentication use Supabase project `wrmemvvzdxxzwstnjcau`. Gmail OAuth, Gmail API, and Pub/Sub resources use Google Cloud project `kym-mail`.
