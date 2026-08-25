@@ -1,6 +1,6 @@
 # Providers
 
-`src/domain/providers` contains deliberately small `MailProvider`, `JobSearchProvider`, and `AIProvider` contracts. Gate 2 implements the mail contract in `src/integrations/google/google-mail-provider.ts`; Gate 5 implements job discovery in `src/integrations/adzuna/adzuna-job-search-provider.ts`; the AI contract remains unimplemented.
+`src/domain/providers` contains deliberately small `MailProvider`, `JobSearchProvider`, `JobAnalysisProvider`, and `AIProvider` contracts. Gate 2 implements the mail contract in `src/integrations/google/google-mail-provider.ts`; Gate 5 implements job discovery in `src/integrations/adzuna/adzuna-job-search-provider.ts`; Gate 7 implements a bounded job-analysis interpreter in `src/integrations/analysis/deterministic-job-analysis-provider.ts`. The general AI contract remains unimplemented.
 
 Vendor adapters belong outside domain logic and implement these contracts. Domain services receive a provider implementation rather than importing Google APIs directly. The Google adapter owns token refresh, profile/send-as discovery, message/history reads, sends, attachment downloads, and Gmail watch creation. It translates provider failures into safe application errors and marks a connection `reauth_required` when refresh cannot recover.
 
@@ -19,3 +19,7 @@ The standard API returns a description snippet rather than the full source posti
 Adzuna credentials are `ADZUNA_APP_ID` and `ADZUNA_APP_KEY`, server-only. The [published terms](https://developer.adzuna.com/docs/terms_of_service) require Jobs by Adzuna attribution and define default limits of 25 calls/minute, 250/day, 1,000/week, and 2,500/month. The current adapter performs one provider call per search/page and a second verification call when saving. Rate-limit, timeout, authentication, malformed JSON, and malformed-record failures become safe KYM Mail domain errors; fake fallback results are prohibited. A replacement provider implements the same contract and mapping without changing JobOpportunity, Project, or Jobs UI code.
 
 The bundled `public/adzuna-logo.svg` is Adzuna's official press asset and is used only to satisfy the provider's required listing attribution.
+
+## Job analysis provider
+
+Gate 7 injects `JobAnalysisProvider`. V1 uses `DeterministicJobAnalysisProvider`, which extracts structured requirements from the stored job description and ranks candidate Master Career Profile evidence. It never assigns match state, the overall percentage, or persistence. Structured output is Zod-validated, original requirement wording must appear in the job description, and evidence IDs must resolve to loaded Gate 6 records. A future LLM adapter can implement the same contract; application logic still owns scoring, `NO_MATCH` versus `UNVERIFIED`, material gaps, and stale/re-analysis rules.

@@ -1,6 +1,6 @@
 type Level = "debug" | "info" | "warn" | "error";
 const priorities: Record<Level, number> = { debug: 10, info: 20, warn: 30, error: 40 };
-const blocked = /token|secret|password|authorization|cookie|email/i;
+const blocked = /token|secret|password|authorization|cookie|email|description|resume|career|profile/i;
 
 function sanitize(context: Record<string, unknown>) {
   return Object.fromEntries(Object.entries(context).map(([key, value]) => [key, blocked.test(key) ? "[REDACTED]" : value]));

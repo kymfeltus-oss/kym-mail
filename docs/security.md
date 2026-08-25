@@ -12,6 +12,8 @@ Job Search credentials remain server-only and never use a `NEXT_PUBLIC_` name. S
 
 Master Career Profile tables are owner-readable and client read-only. Authenticated and anonymous roles receive no mutation grants; imports require the server-only service-role key and are never exposed through an HTTP route. The importer validates structure and references before connecting, rejects authority downgrades, and logs counts rather than secrets or complete source content. Resume PDFs and temporary source manifests remain outside Git and public application assets. Future AI receives no write boundary to authoritative career facts.
 
+Job-match analyses are owner-only. `job_analyses`, `job_analysis_requirements`, and `job_analysis_evidence` use owner RLS with no anonymous policy. Analysis APIs resolve the session on the server, require same-origin mutations, and log job/analysis identifiers and failure codes rather than job-description or career-profile content. Evidence rows must reference career records owned by the same owner.
+
 ## Temporary local authentication bypass
 
 `KYM_DEV_AUTH_BYPASS=true` enables a development-only owner context. The authoritative check requires `NODE_ENV` to be non-production; production ignores the flag even if it is set. The resolver uses `KYM_DEV_OWNER_EMAIL` to find the existing owner and a server-only `SUPABASE_SERVICE_ROLE_KEY` to read through the same data client interface. Neither value enters the client bundle. The bypass has no rendered UI, badge, banner, or product-facing indicator; a structured server log is the only diagnostic.

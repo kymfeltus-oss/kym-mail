@@ -2,11 +2,13 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getOwnerContext } from "@/lib/auth/owner-context";
 import { toSafeError } from "@/lib/errors";
+import { sanitizeStoredJobDescription } from "@/lib/jobs/analysis";
 import { setJobOpportunityProjects } from "@/lib/jobs/persistence";
 
 const mutationSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("status"), status: z.enum(["SAVED", "ARCHIVED"]) }),
-  z.object({ kind: z.literal("projects"), projectIds: z.array(z.string().uuid()).max(50) })
+  z.object({ kind: z.literal("projects"), projectIds: z.array(z.string().uuid()).max(50) }),
+  z.object({ kind: z.literal("description"), description: z.string().max(30000) })
 ]);
 
 function sameOrigin(request: NextRequest) {
@@ -24,6 +26,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const mutation = mutationSchema.parse(await request.json());
     if (mutation.kind === "projects") {
       await setJobOpportunityProjects(owner.database, owner.user.id, jobId, mutation.projectIds);
+      return NextResponse.json({ updated: true });
+    }
+    if (mutation.kind === "description") {
+      const description = sanitizeStoredJobDescription(mutation.description);
+      const { data, error } = await owner.database.from("job_opportunities").update({ description_text: description }).eq("id", jobId).eq("owner_id", owner.user.id).eq("status", "SAVED").select("id").maybeSingle();
+      if (error) throw new Error("JOB_UPDATE_FAILED");
+      if (!data) return NextResponse.json({ error: "Saved job not found." }, { status: 404 });
       return NextResponse.json({ updated: true });
     }
     const { data, error } = await owner.database.from("job_opportunities").update({ status: mutation.status, saved_at: mutation.status === "SAVED" ? new Date().toISOString() : undefined }).eq("id", jobId).eq("owner_id", owner.user.id).select("id").maybeSingle();
