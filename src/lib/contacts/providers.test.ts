@@ -4,15 +4,13 @@ import { getContactProviderConfiguration, getContactProviders } from "./provider
 
 describe("contact provider registry", () => {
   it("preserves the truthful unconfigured state when Apollo is absent", () => {
-    expect(getContactProviderConfiguration(getContactProviders({}))).toEqual({ people: null, email: null, verification: null });
+    expect(getContactProviderConfiguration(getContactProviders({}))).toEqual({ people: null, requirement: "Configure server-only APOLLO_API_KEY with organization enrichment, People API Search, and People Enrichment access." });
   });
 
-  it("registers one shared Apollo adapter for people and business email", () => {
+  it("registers Apollo only behind the Gate 8 people boundary", () => {
     const providers = getContactProviders({ APOLLO_API_KEY: "apollo-secret-key" });
     expect(providers.people?.key).toBe("apollo");
-    expect(providers.email?.key).toBe("apollo");
-    expect(providers.email).toBe(providers.people);
-    expect(providers.verification).toBeNull();
+    expect(getContactProviderConfiguration(providers)).toEqual({ people: "apollo", requirement: null });
   });
 
   it("rejects an explicitly supplied malformed key", () => {

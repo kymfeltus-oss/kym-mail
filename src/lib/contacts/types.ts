@@ -1,18 +1,26 @@
 import { z } from "zod";
 
 export const contactClassifications = [
-  "LIKELY_HIRING_MANAGER", "FUNCTIONAL_LEADER", "EXECUTIVE_SPONSOR",
+  "FUNCTIONAL_LEADER", "EXECUTIVE_SPONSOR",
   "ACCOUNTING_LEADER", "FINANCE_LEADER", "SYSTEMS_LEADER",
   "RECRUITER", "TALENT_ACQUISITION", "OTHER_RELEVANT"
 ] as const;
 export const contactEmailStatuses = ["VERIFIED", "DELIVERABLE", "LIKELY", "UNVERIFIED", "RISKY", "INVALID", "NOT_FOUND"] as const;
 export const contactSearchStatuses = ["NOT_SEARCHED", "SEARCHING", "COMPLETE", "PARTIAL", "FAILED", "STALE"] as const;
 export const contactSourceTypes = ["PEOPLE_PROVIDER", "EMAIL_PROVIDER", "VERIFICATION_PROVIDER", "JOB_POSTING", "USER_ENTERED"] as const;
+export const postingTypes = ["DIRECT_EMPLOYER", "AGENCY_RECRUITER", "UNKNOWN"] as const;
+export const personVerificationStates = ["VERIFIED", "LIKELY_CURRENT", "STALE_OR_UNCERTAIN", "UNVERIFIED"] as const;
+export const contactRelevanceLevels = ["HIGH", "MEDIUM", "LOW"] as const;
+export const contactApprovalStates = ["DISCOVERED", "RECOMMENDED", "APPROVED", "REJECTED", "STALE"] as const;
 
 export type ContactClassification = (typeof contactClassifications)[number];
 export type ContactEmailStatus = (typeof contactEmailStatuses)[number];
 export type ContactSearchStatus = (typeof contactSearchStatuses)[number];
 export type ContactSourceType = (typeof contactSourceTypes)[number];
+export type PostingType = (typeof postingTypes)[number];
+export type PersonVerificationState = (typeof personVerificationStates)[number];
+export type ContactRelevanceLevel = (typeof contactRelevanceLevels)[number];
+export type ContactApprovalState = (typeof contactApprovalStates)[number];
 
 export const discoveredPersonSchema = z.object({
   providerKey: z.string().regex(/^[a-z0-9][a-z0-9._-]{1,79}$/),
@@ -70,10 +78,13 @@ export type RankedContact = DiscoveredPerson & {
   dedupeKey: string;
   emails: Array<DiscoveredEmail & { verification: VerificationResult | null }>;
   provenance: DiscoveredPerson[];
+  verificationState: PersonVerificationState;
+  relevanceLevel: ContactRelevanceLevel;
+  recommendationLabel: string;
 };
 
 export type ContactIntelligenceView = {
-  providerConfiguration: { people: string | null; email: string | null; verification: string | null };
+  providerConfiguration: { people: string | null; requirement: string | null };
   organization: null | {
     id: string;
     canonicalName: string;
@@ -91,7 +102,13 @@ export type ContactIntelligenceView = {
     failureMessage: string | null;
     completedAt: string | null;
     refreshAfter: string | null;
+    postingType: PostingType;
+    postingTypeReasons: string[];
+    postingTypeEvidence: Array<{ label: string; value: string }>;
+    projectId: string | null;
+    providerUsage: { requests: number; credits: number | null };
   };
+  resumeContext: null | { versionId: string; versionNumber: number; status: "APPROVED" | "STALE"; projectId: string | null };
   contacts: Array<{
     id: string;
     fullName: string;
@@ -105,20 +122,18 @@ export type ContactIntelligenceView = {
     classifications: ContactClassification[];
     relevanceScore: number;
     relevanceReasons: string[];
-    isPreferred: boolean;
+    approvalState: ContactApprovalState;
+    verificationState: PersonVerificationState;
+    relevanceLevel: ContactRelevanceLevel;
+    recommendationLabel: string;
+    approvedAt: string | null;
+    rejectedAt: string | null;
+    projectId: string | null;
+    researchVersion: number;
     status: "ACTIVE" | "STALE" | "ARCHIVED";
     sourceProvider: string;
     discoveredAt: string;
     lastConfirmedAt: string;
-    emails: Array<{
-      id: string;
-      email: string;
-      type: "BUSINESS" | "PERSONAL" | "UNKNOWN";
-      status: ContactEmailStatus;
-      sourceProvider: string;
-      isPatternBased: boolean;
-      verifiedAt: string | null;
-    }>;
     sources: Array<{
       id: string;
       sourceType: ContactSourceType;

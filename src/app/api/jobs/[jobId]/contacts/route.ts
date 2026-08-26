@@ -3,13 +3,13 @@ import { z } from "zod";
 import { getOwnerContext } from "@/lib/auth/owner-context";
 import { getContactProviderConfiguration, getContactProviders } from "@/lib/contacts/providers";
 import { loadContactIntelligenceView } from "@/lib/contacts/store";
-import { addManualContact, runContactSearch, selectPreferredContact } from "@/lib/contacts/workflow";
+import { addManualContact, approveContact, rejectContact, runContactSearch } from "@/lib/contacts/workflow";
 import { AppError, toSafeError } from "@/lib/errors";
 import { log } from "@/lib/logger";
 
 const bodySchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("SEARCH") }),
-  z.object({ action: z.literal("REFRESH") }),
+  z.object({ action: z.literal("SEARCH"), projectId: z.string().uuid().nullable().optional() }),
+  z.object({ action: z.literal("REFRESH"), projectId: z.string().uuid().nullable().optional() }),
   z.object({
     action: z.literal("MANUAL_ADD"),
     fullName: z.string().trim().min(2).max(160),
@@ -18,10 +18,11 @@ const bodySchema = z.discriminatedUnion("action", [
     seniority: z.string().trim().max(80).optional(),
     location: z.string().trim().max(200).optional(),
     professionalProfileUrl: z.union([z.string().url().startsWith("https://"), z.literal("")]).optional(),
-    email: z.union([z.string().trim().toLowerCase().email(), z.literal("")]).optional(),
-    emailType: z.enum(["BUSINESS", "PERSONAL", "UNKNOWN"]).optional()
+    evidenceUrl: z.union([z.string().url().startsWith("https://"), z.literal("")]).optional(),
+    projectId: z.string().uuid().nullable().optional()
   }),
-  z.object({ action: z.literal("SELECT_PREFERRED"), contactId: z.string().uuid() })
+  z.object({ action: z.literal("APPROVE"), contactId: z.string().uuid() }),
+  z.object({ action: z.literal("REJECT"), contactId: z.string().uuid() })
 ]);
 
 function sameOrigin(request: NextRequest) {
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!parsed.success) return NextResponse.json({ error: "Contact request is invalid." }, { status: 422 });
   try {
     if (parsed.data.action === "SEARCH" || parsed.data.action === "REFRESH") {
-      const result = await runContactSearch(owner.database, owner.user.id, jobId, getContactProviders());
+      const result = await runContactSearch(owner.database, owner.user.id, jobId, getContactProviders(), parsed.data.projectId);
       log("info", "job_contact_search_completed", { jobId, status: result.status, discovered: result.discovered });
       return NextResponse.json(result);
     }
@@ -67,9 +68,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       log("info", "job_contact_manual_added", { jobId, contactId: result.contactId });
       return NextResponse.json(result, { status: 201 });
     }
-    await selectPreferredContact(owner.database, owner.user.id, jobId, parsed.data.contactId);
-    log("info", "job_contact_preferred_selected", { jobId, contactId: parsed.data.contactId });
-    return NextResponse.json({ contactId: parsed.data.contactId, preferred: true });
+    if (parsed.data.action === "APPROVE") {
+      await approveContact(owner.database, owner.user.id, jobId, parsed.data.contactId);
+      log("info", "job_contact_approved", { jobId, contactId: parsed.data.contactId });
+      return NextResponse.json({ contactId: parsed.data.contactId, approvalState: "APPROVED" });
+    }
+    await rejectContact(owner.database, owner.user.id, jobId, parsed.data.contactId);
+    log("info", "job_contact_rejected", { jobId, contactId: parsed.data.contactId });
+    return NextResponse.json({ contactId: parsed.data.contactId, approvalState: "REJECTED" });
   } catch (error) {
     const safe = toSafeError(error);
     log("warn", "job_contact_action_failed", { jobId, action: parsed.data.action, code: safe.code });

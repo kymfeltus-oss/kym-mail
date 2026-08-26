@@ -1,6 +1,6 @@
 # Locked Project context and future career-outreach architecture
 
-> Status: Gates 5–8 implement real Job Search, Saved Jobs, Career Match, and truthful tailored resumes. Gate 9 implements the contact-intelligence architecture, persistence, security, review UI, manual entry, and preferred selection, but real people/email/verification providers are not configured and live discovery remains pending. Outreach generation and the remaining downstream workflow are authoritative future roadmap only.
+> Status: Gates 5–7 implement Job Search, Career Match, and truthful tailored resumes. Gate 8 implements the people-research and owner-approval boundary, with live provider acceptance still dependent on a configured key. Gate 9 Email Intelligence and all outreach remain future gated work.
 
 Gate 6 is the authoritative evidence boundary for every later career workflow. It now supports owner-reviewed edits with immutable history while source precedence, unknown/partial facts, provenance, and resolved authority remain explicit. This unlocks evidence-backed matching and truthful resume presentation already implemented in Gates 7 and 8; it does not authorize contact discovery, cover-letter generation, automated outreach, autonomous applications, or any other later workflow by itself.
 

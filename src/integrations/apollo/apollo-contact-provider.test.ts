@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildTargetRoleStrategy, discoverContacts } from "@/lib/contacts/intelligence";
+import { buildTargetRoleStrategy, discoverRelevantPeople } from "@/lib/contacts/intelligence";
 import { ConfigurationError, ProviderUnavailableError } from "@/lib/errors";
 import { ApolloContactProvider, normalizeApolloBusinessEmail, normalizeApolloPerson } from "./apollo-contact-provider";
 
@@ -82,7 +82,7 @@ describe("Apollo contact provider", () => {
   it("excludes a provider person whose current company does not match", async () => {
     const fetcher = providerFetcher({ person: { organization_id: "other-org", organization: { id: "other-org", name: "Different Company", primary_domain: "different.example" } } });
     const provider = new ApolloContactProvider(credentials, fetcher as typeof fetch);
-    const result = await discoverContacts({ organization: request.organization, targetRoles: request.targetRoles, providers: { people: provider, email: provider, verification: null } });
+    const result = await discoverRelevantPeople({ organization: request.organization, targetRoles: request.targetRoles, postingType: "DIRECT_EMPLOYER", people: provider });
     expect(result.contacts).toHaveLength(0);
   });
 
@@ -148,8 +148,8 @@ describe("Apollo contact provider", () => {
   it("does not add duplicate contacts when the same provider identity is refreshed", async () => {
     const fetcher = providerFetcher();
     const provider = new ApolloContactProvider(credentials, fetcher as typeof fetch);
-    const first = await discoverContacts({ organization: request.organization, targetRoles: request.targetRoles, providers: { people: provider, email: provider, verification: null } });
-    const second = await discoverContacts({ organization: request.organization, targetRoles: request.targetRoles, providers: { people: provider, email: provider, verification: null } });
+    const first = await discoverRelevantPeople({ organization: request.organization, targetRoles: request.targetRoles, postingType: "DIRECT_EMPLOYER", people: provider });
+    const second = await discoverRelevantPeople({ organization: request.organization, targetRoles: request.targetRoles, postingType: "DIRECT_EMPLOYER", people: provider });
     expect(first.contacts).toHaveLength(1);
     expect(second.contacts).toHaveLength(1);
     expect(first.contacts[0].dedupeKey).toBe(second.contacts[0].dedupeKey);
