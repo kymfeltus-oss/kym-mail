@@ -64,7 +64,7 @@ Recipient HTML uses a stripped public view with no evidence identifiers or inter
 
 ## Calendar and paid consultations
 
-Calendar is an additive bounded context. Cal.com owns availability and Google Calendar event creation; KYM Mail owns only consultation configuration, manual payment-proof review, secure release, and booking-state reconciliation. Cash App has no API or credential boundary in this repository. The deterministic lifecycle is `AWAITING_PAYMENT → PAYMENT_SUBMITTED → PAYMENT_APPROVED → BOOKING_RELEASED → BOOKED`, with explicit `PAYMENT_REJECTED` and `CANCELLED` exits. Application services and a database RPC own transitions; AI has no role.
+Calendar is an additive bounded context. Cal.com owns availability and Google Calendar event creation; KYM Mail owns only consultation configuration, manual payment-proof review, secure release, and booking-state reconciliation. Zelle has no API or credential boundary in this repository. The deterministic lifecycle is `AWAITING_PAYMENT → PAYMENT_SUBMITTED → PAYMENT_APPROVED → BOOKING_RELEASED → BOOKED`, with explicit `PAYMENT_REJECTED` and `CANCELLED` exits. Application services and a database RPC own transitions; AI has no role.
 
 The paid catalog is centralized and immutable in application logic: first-time consultation, 60 minutes, $200; returning consultation, 60 minutes, $150. A returning-rate submission requires a completed first-time booking for the same normalized client email. Cal.com URLs and payment instructions remain owner-managed persisted settings. No free meeting is exposed.
 

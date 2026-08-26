@@ -28,8 +28,9 @@ describe("consultation security and provider contract", () => {
     expect(consultationOfferings.RETURNING).toMatchObject({ durationMinutes: 60, priceCents: 15_000 });
     expect(consultationKindForHistory(false)).toBe("FIRST_TIME");
     expect(consultationKindForHistory(true)).toBe("RETURNING");
-    expect(consultationSettingsSchema.safeParse({ cashAppHandle: "$owner", paymentInstructions: "Pay the exact amount shown.", referenceInstructions: "Use your email.", firstTimeBookingUrl: "https://cal.com/owner/first", returningBookingUrl: "https://cal.com/owner/returning", isActive: true }).success).toBe(true);
-    expect(consultationSettingsSchema.safeParse({ cashAppHandle: "$owner", paymentInstructions: "Pay the exact amount shown.", firstTimeBookingUrl: "https://example.com/book", returningBookingUrl: "https://cal.com/owner/returning", isActive: true }).success).toBe(false);
+    expect(consultationSettingsSchema.safeParse({ zelleRecipientName: "Kym Feltus", zelleContact: "470-736-1132", paymentInstructions: "Pay the exact amount shown.", referenceInstructions: "Use your email.", firstTimeBookingUrl: "https://cal.com/owner/first", returningBookingUrl: "https://cal.com/owner/returning", isActive: true }).success).toBe(true);
+    expect(consultationSettingsSchema.safeParse({ zelleRecipientName: "Kym Feltus", zelleContact: "not-a-contact", paymentInstructions: "Pay the exact amount shown.", firstTimeBookingUrl: "https://cal.com/owner/first", returningBookingUrl: "https://cal.com/owner/returning", isActive: true }).success).toBe(false);
+    expect(consultationSettingsSchema.safeParse({ zelleRecipientName: "Kym Feltus", zelleContact: "kym@example.com", paymentInstructions: "Pay the exact amount shown.", firstTimeBookingUrl: "https://example.com/book", returningBookingUrl: "https://cal.com/owner/returning", isActive: true }).success).toBe(false);
     expect(consultationSubmissionSchema.parse({ name: "Test Client", email: "TEST@example.com", consultationKind: "FIRST_TIME" }).email).toBe("test@example.com");
     expect(consultationSubmissionSchema.safeParse({ name: "Test Client", email: "test@example.com", consultationKind: "FREE" }).success).toBe(false);
     expect(existsSync("src/app/api/consultations/free/route.ts")).toBe(false);
@@ -64,5 +65,8 @@ describe("consultation security and provider contract", () => {
     const offeringsMigration = readFileSync("supabase/migrations/202608260028_two_paid_consultation_offerings.sql", "utf8");
     expect(offeringsMigration).toContain("consultation_kind in ('FIRST_TIME', 'RETURNING')");
     expect(offeringsMigration).toContain("returning_booking_url");
+    const zelleMigration = readFileSync("supabase/migrations/202608260029_zelle_consultation_payments.sql", "utf8");
+    expect(zelleMigration).toContain("rename column cash_app_handle to zelle_contact");
+    expect(zelleMigration).toContain("zelle_recipient_name");
   });
 });

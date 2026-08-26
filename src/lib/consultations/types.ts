@@ -17,7 +17,8 @@ export type ConsultationSettings = {
   consultation_name: string;
   duration_minutes: number;
   price_cents: number;
-  cash_app_handle: string;
+  zelle_recipient_name: string;
+  zelle_contact: string;
   payment_instructions: string;
   reference_instructions: string | null;
   paid_booking_url: string;

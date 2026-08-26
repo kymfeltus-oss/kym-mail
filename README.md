@@ -1,6 +1,6 @@
 # KYM Mail
 
-KYM Mail is a private email and career-outreach application. This independent repository contains the Gate 1 foundation through Gate 8 Hiring Intelligence plus an isolated Calendar and paid-consultation flow: real Supabase authentication, an owner-scoped unified mailbox, contextual Projects, deterministic scheduled delivery, real Adzuna job discovery, Saved Jobs, the authoritative Master Career Profile, evidence-linked job-match analysis, versioned factual resume generation with DOCX/PDF export, owner-secured people research, and manual Cash App proof approval before Cal.com booking access.
+KYM Mail is a private email and career-outreach application. This independent repository contains the Gate 1 foundation through Gate 8 Hiring Intelligence plus an isolated Calendar and paid-consultation flow: real Supabase authentication, an owner-scoped unified mailbox, contextual Projects, deterministic scheduled delivery, real Adzuna job discovery, Saved Jobs, the authoritative Master Career Profile, evidence-linked job-match analysis, versioned factual resume generation with DOCX/PDF export, owner-secured people research, and manual Zelle proof approval before Cal.com booking access.
 
 The production Apollo organization/people adapter remains disabled until `APOLLO_API_KEY` is configured and live-verified. Gate 8 does not discover, infer, verify, display, or use email addresses. Email Intelligence and downstream outreach remain future gated work.
 
@@ -31,6 +31,6 @@ Quality commands: `npm run lint`, `npm run typecheck`, `npm test`, `npm run buil
 
 During local UI development, the temporary server-only auth bypass can be enabled with `KYM_DEV_AUTH_BYPASS=true`; see `docs/security.md`. It is forcibly disabled in production and does not change database RLS.
 
-Calendar settings live at `/app/calendar`; public consultation intake lives at `/consult`. Cal.com is the only scheduling provider and must be connected to Google Calendar in Cal.com. KYM Mail offers only the fixed 60-minute first-time ($200) and returning-client ($150) paid consultations; there is no free-meeting flow. KYM Mail never calls Cash App: it accepts a private proof upload, records a manual owner decision, and releases an expiring token only after approval.
+Calendar settings live at `/app/calendar`; public consultation intake lives at `/consult`. Cal.com is the only scheduling provider and must be connected to Google Calendar in Cal.com. KYM Mail offers only the fixed 60-minute first-time ($200) and returning-client ($150) paid consultations; there is no free-meeting flow. KYM Mail never calls Zelle: it accepts a private proof upload, records a manual owner decision, and releases an expiring token only after approval.
 
 See [architecture](docs/architecture.md), [database](docs/database.md), [providers](docs/providers.md), [security](docs/security.md), [testing](docs/testing.md), [deployment](docs/deployment.md), [handover](docs/handover.md), and the [locked future career-outreach architecture](docs/future-career-outreach-workflow.md). That roadmap distinguishes implemented workflow gates from provider-dependent and future outreach work.

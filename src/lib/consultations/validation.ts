@@ -18,7 +18,8 @@ export const consultationSubmissionSchema = z.object({
 });
 
 export const consultationSettingsSchema = z.object({
-  cashAppHandle: z.string().trim().regex(/^\$[A-Za-z0-9_]{1,20}$/, "Use a Cash App handle beginning with $."),
+  zelleRecipientName: z.string().trim().min(2).max(120),
+  zelleContact: z.string().trim().regex(/^(?:\+?[0-9][0-9 ()-]{6,29}|[^\s@]+@[^\s@]+\.[^\s@]+)$/, "Enter the Zelle phone number or email."),
   paymentInstructions: z.string().trim().min(10).max(1000),
   referenceInstructions: z.string().trim().max(500).optional().or(z.literal("")),
   firstTimeBookingUrl: calUrl,

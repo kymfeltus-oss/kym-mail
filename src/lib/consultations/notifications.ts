@@ -22,12 +22,12 @@ function notificationCopy(input: NotificationInput, ownerEmail: string) {
   if (input.kind === "OWNER_REVIEW") return {
     to: ownerEmail,
     subject: `Payment proof submitted — ${input.clientName}`,
-    body: `${input.clientName} submitted payment proof for ${input.consultationName} (${formatConsultationAmount(input.expectedAmountCents)}).\n\nReview this submission in KYM Mail: ${getAppUrl()}/app/calendar\n\nThis is a manual proof review. Cash App has not verified or confirmed funds.`
+    body: `${input.clientName} submitted Zelle payment proof for ${input.consultationName} (${formatConsultationAmount(input.expectedAmountCents)}).\n\nReview this submission in KYM Mail: ${getAppUrl()}/app/calendar\n\nThis is a manual proof review. Zelle has not verified or confirmed funds.`
   };
   if (input.kind === "APPROVED") return {
     to: input.clientEmail,
     subject: "Your consultation booking link is ready",
-    body: `Hi ${input.clientName},\n\nYour payment proof has been approved by the owner. You may now schedule your ${input.consultationName}.\n\nSecure booking link: ${getAppUrl()}/consult/book/${input.bookingToken}\n\nThis approval reflects manual review of the submitted proof; it is not automatic Cash App verification.`
+    body: `Hi ${input.clientName},\n\nYour Zelle payment proof has been approved by the owner. You may now schedule your ${input.consultationName}.\n\nSecure booking link: ${getAppUrl()}/consult/book/${input.bookingToken}\n\nThis approval reflects manual review of the submitted proof; it is not automatic Zelle verification.`
   };
   if (input.kind === "REJECTED") return {
     to: input.clientEmail,
