@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlertTriangle, ArrowRight, BriefcaseBusiness, CalendarClock, FileCheck2, FolderKanban, Inbox, MailCheck, Plus, SquarePen } from "lucide-react";
+import { AlertTriangle, ArrowRight, BriefcaseBusiness, CalendarCheck2, CalendarClock, FileCheck2, FolderKanban, Inbox, MailCheck, Plus, SquarePen } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { getOwnerContext } from "@/lib/auth/owner-context";
 import { formatMailTimestamp } from "@/lib/mail/date-format";
@@ -20,6 +20,7 @@ export default async function DashboardPage() {
   const owner = await getOwnerContext();
   if (!owner?.user.email) redirect("/sign-in");
   const { database, user } = owner;
+  const now = new Date().toISOString();
   const [
     { count: unreadCount, error: unreadError },
     { count: activeProjectCount, error: projectCountError },
@@ -30,7 +31,10 @@ export default async function DashboardPage() {
     { count: scheduledCount, error: scheduledCountError },
     { data: nextScheduled, error: nextScheduledError },
     { count: savedJobsCount, error: savedJobsCountError },
-    { data: recentJobs, error: recentJobsError }
+    { data: recentJobs, error: recentJobsError },
+    { count: pendingConsultations, error: pendingConsultationsError },
+    { count: upcomingConsultations, error: upcomingConsultationsError },
+    { data: nextConsultation, error: nextConsultationError }
   ] = await Promise.all([
     database.from("mail_threads").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("is_unread", true),
     database.from("projects").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("status", "ACTIVE"),
@@ -41,9 +45,12 @@ export default async function DashboardPage() {
     database.from("scheduled_messages").select("id", { count: "exact", head: true }).eq("owner_id", user.id).in("status", ["SCHEDULED", "PROCESSING"]),
     database.from("scheduled_messages").select("id, subject, scheduled_for, timezone").eq("owner_id", user.id).eq("status", "SCHEDULED").order("scheduled_for").limit(1).maybeSingle(),
     database.from("job_opportunities").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("status", "SAVED"),
-    database.from("job_opportunities").select("id, title, company_name, location_text, saved_at").eq("owner_id", user.id).eq("status", "SAVED").order("saved_at", { ascending: false }).limit(3)
+    database.from("job_opportunities").select("id, title, company_name, location_text, saved_at").eq("owner_id", user.id).eq("status", "SAVED").order("saved_at", { ascending: false }).limit(3),
+    database.from("consultation_requests").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("payment_status", "PAYMENT_SUBMITTED"),
+    database.from("consultation_requests").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("payment_status", "BOOKED").gte("booking_start_at", now),
+    database.from("consultation_requests").select("client_name, booking_start_at").eq("owner_id", user.id).eq("payment_status", "BOOKED").gte("booking_start_at", now).order("booking_start_at").limit(1).maybeSingle()
   ]);
-  if (unreadError || projectCountError || projectsError || threadsError || identitiesError || activityError || scheduledCountError || nextScheduledError || savedJobsCountError || recentJobsError) throw new Error("DASHBOARD_UNAVAILABLE");
+  if (unreadError || projectCountError || projectsError || threadsError || identitiesError || activityError || scheduledCountError || nextScheduledError || savedJobsCountError || recentJobsError || pendingConsultationsError || upcomingConsultationsError || nextConsultationError) throw new Error("DASHBOARD_UNAVAILABLE");
 
   const activityProjectIds = [...new Set((activity ?? []).map((item) => item.project_id))];
   const { data: activityProjects, error: activityProjectsError } = activityProjectIds.length
@@ -72,6 +79,8 @@ export default async function DashboardPage() {
         <Link href="/app/scheduled" className="rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-6 shadow-[0_14px_42px_rgba(24,58,90,.06)] transition hover:-translate-y-0.5"><span className="grid size-10 place-items-center rounded-2xl bg-[#FFF3F4] text-[#D95B72]"><CalendarClock className="size-5" /></span><p className="mt-5 text-3xl font-semibold tracking-[-.04em] text-[#183A5A]">{scheduledCount ?? 0}</p><p className="mt-1 text-sm text-[#64748B]">Scheduled email{scheduledCount === 1 ? "" : "s"}</p>{nextScheduled && <p className="mt-3 truncate text-xs text-[#A73D52]">Next: {nextScheduled.subject}</p>}</Link>
         <Link href="/app/jobs/saved" className="rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-6 shadow-[0_14px_42px_rgba(24,58,90,.06)] transition hover:-translate-y-0.5"><span className="grid size-10 place-items-center rounded-2xl bg-[#FFF3F4] text-[#D95B72]"><BriefcaseBusiness className="size-5" /></span><p className="mt-5 text-3xl font-semibold tracking-[-.04em] text-[#183A5A]">{savedJobsCount ?? 0}</p><p className="mt-1 text-sm text-[#64748B]">Saved job{savedJobsCount === 1 ? "" : "s"}</p></Link>
       </section>
+
+      <section aria-label="Consultation status" className="mt-5 grid gap-3 sm:grid-cols-3"><Link href="/app/calendar" className="flex items-center gap-4 rounded-2xl border border-[#E7DBD8] bg-[#FFFDFC] p-4"><span className="grid size-10 place-items-center rounded-xl bg-amber-50 text-amber-700"><AlertTriangle className="size-5" /></span><span><strong className="block text-xl text-[#3E1D2C]">{pendingConsultations ?? 0}</strong><span className="text-xs text-[#70626A]">Pending payment review{pendingConsultations === 1 ? "" : "s"}</span></span></Link><Link href="/app/calendar" className="flex items-center gap-4 rounded-2xl border border-[#E7DBD8] bg-[#FFFDFC] p-4"><span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-700"><CalendarCheck2 className="size-5" /></span><span><strong className="block text-xl text-[#3E1D2C]">{upcomingConsultations ?? 0}</strong><span className="text-xs text-[#70626A]">Upcoming consultation{upcomingConsultations === 1 ? "" : "s"}</span></span></Link><Link href="/app/calendar" className="flex min-w-0 items-center gap-4 rounded-2xl border border-[#E7DBD8] bg-[#FFFDFC] p-4"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#FFF0F1] text-[#A73D52]"><CalendarClock className="size-5" /></span><span className="min-w-0"><strong className="block truncate text-sm text-[#3E1D2C]">{nextConsultation?.client_name ?? "No next meeting"}</strong><span className="mt-1 block truncate text-xs text-[#70626A]">{nextConsultation?.booking_start_at ? formatMailTimestamp(nextConsultation.booking_start_at) : "Calendar is clear"}</span></span></Link></section>
 
       <section aria-label="Resume status" className="mt-5 grid gap-3 sm:grid-cols-3"><Link href="/app/jobs/saved" className="flex items-center gap-4 rounded-2xl border border-[#E7DBD8] bg-[#FFFDFC] p-4"><span className="grid size-10 place-items-center rounded-xl bg-[#F7F1F2] text-[#8D2948]"><FileCheck2 className="size-5" /></span><span><strong className="block text-xl text-[#3E1D2C]">{resumeNeedsReview}</strong><span className="text-xs text-[#70626A]">Resume version{resumeNeedsReview === 1 ? "" : "s"} needing review</span></span></Link><Link href="/app/jobs/saved" className="flex items-center gap-4 rounded-2xl border border-[#E7DBD8] bg-[#FFFDFC] p-4"><span className="grid size-10 place-items-center rounded-xl bg-[#E8F7EF] text-[#176B4C]"><FileCheck2 className="size-5" /></span><span><strong className="block text-xl text-[#3E1D2C]">{approvedResumes}</strong><span className="text-xs text-[#70626A]">Approved snapshot{approvedResumes === 1 ? "" : "s"}</span></span></Link><Link href="/app/jobs/saved" className="flex items-center gap-4 rounded-2xl border border-[#E7DBD8] bg-[#FFFDFC] p-4"><span className="grid size-10 place-items-center rounded-xl bg-[#FFF0F1] text-[#A73D52]"><AlertTriangle className="size-5" /></span><span><strong className="block text-xl text-[#3E1D2C]">{staleResumes}</strong><span className="text-xs text-[#70626A]">Stale resume{staleResumes === 1 ? "" : "s"}</span></span></Link></section>
 

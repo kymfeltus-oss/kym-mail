@@ -28,6 +28,12 @@ const contactProviderEnvSchema = z.object({
   APOLLO_API_KEY: z.string().trim().min(12)
 });
 
+const consultationWebhookEnvSchema = z.object({
+  CALCOM_WEBHOOK_SECRET: z.string().min(32)
+});
+
+const appUrlEnvSchema = z.object({ APP_URL: z.string().url() });
+
 const googleMailEnvSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().min(10),
   GOOGLE_CLIENT_SECRET: z.string().min(10),
@@ -92,6 +98,18 @@ export function getContactProviderEnv(input: Record<string, string | undefined> 
 
 export function hasContactProviderEnv(input: Record<string, string | undefined> = process.env) {
   return Boolean(input.APOLLO_API_KEY?.trim());
+}
+
+export function getConsultationWebhookEnv(input: Record<string, string | undefined> = process.env) {
+  const result = consultationWebhookEnvSchema.safeParse(input);
+  if (!result.success) throw new ConfigurationError("The Cal.com webhook is not configured.");
+  return result.data;
+}
+
+export function getAppUrl(input: Record<string, string | undefined> = process.env) {
+  const result = appUrlEnvSchema.safeParse(input);
+  if (!result.success) throw new ConfigurationError("The application URL is not configured.");
+  return result.data.APP_URL.replace(/\/$/, "");
 }
 
 export function getGoogleMailEnv(input: Record<string, string | undefined> = process.env) {
