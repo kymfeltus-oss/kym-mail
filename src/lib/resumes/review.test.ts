@@ -19,6 +19,16 @@ describe("Gate 7 strategy and material diff", () => {
     expect(strategy.potentialGaps).toEqual(["Do not claim CPA"]);
     expect(strategy.reduceEmphasis).toContain("Oracle");
   });
+
+  it("bounds persisted Gate 6B strategy text without losing the evidence-driven strategy", () => {
+    const longEvidence = `Surface verified controls leadership ${"and audit-ready reporting ".repeat(30)}`;
+    const strategy = buildResumeStrategy({ resumeUnderselling: [longEvidence] }, master, tailored);
+
+    expect(strategy.addVerifiedEvidence).toHaveLength(1);
+    expect(strategy.addVerifiedEvidence[0].length).toBeLessThanOrEqual(500);
+    expect(strategy.addVerifiedEvidence[0]).toMatch(/^Surface verified controls leadership/);
+    expect(strategy.addVerifiedEvidence[0]).toMatch(/…$/);
+  });
   it("produces concise summary and skill changes instead of two giant documents", () => {
     const diff = buildResumeDiff(master, tailored);
     expect(diff.some((item) => item.section === "SUMMARY" && item.kind === "REWRITTEN")).toBe(true);

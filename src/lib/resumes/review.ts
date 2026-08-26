@@ -10,8 +10,18 @@ type AnalysisSummary = {
   recommendedResumeStrategy?: string[];
 };
 
+function boundedStrategyText(value: string) {
+  const normalized = value.trim().replace(/\s+/g, " ");
+  if (normalized.length <= 500) return normalized;
+  const clipped = normalized.slice(0, 499);
+  const sentenceBreak = Math.max(clipped.lastIndexOf(". "), clipped.lastIndexOf("; "));
+  const wordBreak = clipped.lastIndexOf(" ");
+  const end = sentenceBreak >= 320 ? sentenceBreak + 1 : wordBreak >= 320 ? wordBreak : 499;
+  return `${clipped.slice(0, end).trimEnd()}…`;
+}
+
 function unique(items: Array<string | null | undefined>, limit: number) {
-  return [...new Set(items.map((item) => item?.trim()).filter((item): item is string => Boolean(item && item.length >= 2)))].slice(0, limit);
+  return [...new Set(items.map((item) => item?.trim()).filter((item): item is string => Boolean(item && item.length >= 2)).map(boundedStrategyText))].slice(0, limit);
 }
 
 export function buildResumeStrategy(summary: AnalysisSummary, master: MasterResumeContent, tailored: ResumeContent): ResumeStrategy {
