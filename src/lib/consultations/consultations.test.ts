@@ -1,10 +1,11 @@
 import { createHmac, randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { buildCalBookingUrl, parseCalWebhook, verifyCalWebhookSignature } from "@/lib/consultations/provider";
 import { hasExpectedProofSignature, safeConsultationProofName } from "@/lib/consultations/proof";
 import { createConsultationToken, hashConsultationToken, isConsultationToken } from "@/lib/consultations/tokens";
 import { consultationSettingsSchema, consultationSubmissionSchema } from "@/lib/consultations/validation";
+import { consultationKindForHistory, consultationOfferings } from "@/lib/consultations/offerings";
 
 describe("consultation security and provider contract", () => {
   it("creates unguessable tokens and persists only deterministic hashes", () => {
@@ -22,10 +23,16 @@ describe("consultation security and provider contract", () => {
     expect(safeConsultationProofName("../payment proof (final).PDF")).toBe("payment-proof-final-.PDF");
   });
 
-  it("restricts settings to Cal.com and does not trust a client-authored consultation type", () => {
-    expect(consultationSettingsSchema.safeParse({ consultationName: "Advisory Consultation", durationMinutes: 45, priceDollars: 250, cashAppHandle: "$owner", paymentInstructions: "Pay the exact amount shown.", referenceInstructions: "Use your email.", paidBookingUrl: "https://cal.com/owner/private", freeBookingUrl: "https://cal.com/owner/free", isActive: true }).success).toBe(true);
-    expect(consultationSettingsSchema.safeParse({ consultationName: "Advisory Consultation", durationMinutes: 45, priceDollars: 250, cashAppHandle: "$owner", paymentInstructions: "Pay the exact amount shown.", paidBookingUrl: "https://example.com/book", freeBookingUrl: "https://cal.com/owner/free", isActive: true }).success).toBe(false);
-    expect(consultationSubmissionSchema.parse({ name: "Test Client", email: "TEST@example.com", consultationType: "Advisory Consultation" }).email).toBe("test@example.com");
+  it("enforces the two fixed paid offerings and Cal.com-only booking settings", () => {
+    expect(consultationOfferings.FIRST_TIME).toMatchObject({ durationMinutes: 60, priceCents: 20_000 });
+    expect(consultationOfferings.RETURNING).toMatchObject({ durationMinutes: 60, priceCents: 15_000 });
+    expect(consultationKindForHistory(false)).toBe("FIRST_TIME");
+    expect(consultationKindForHistory(true)).toBe("RETURNING");
+    expect(consultationSettingsSchema.safeParse({ cashAppHandle: "$owner", paymentInstructions: "Pay the exact amount shown.", referenceInstructions: "Use your email.", firstTimeBookingUrl: "https://cal.com/owner/first", returningBookingUrl: "https://cal.com/owner/returning", isActive: true }).success).toBe(true);
+    expect(consultationSettingsSchema.safeParse({ cashAppHandle: "$owner", paymentInstructions: "Pay the exact amount shown.", firstTimeBookingUrl: "https://example.com/book", returningBookingUrl: "https://cal.com/owner/returning", isActive: true }).success).toBe(false);
+    expect(consultationSubmissionSchema.parse({ name: "Test Client", email: "TEST@example.com", consultationKind: "FIRST_TIME" }).email).toBe("test@example.com");
+    expect(consultationSubmissionSchema.safeParse({ name: "Test Client", email: "test@example.com", consultationKind: "FREE" }).success).toBe(false);
+    expect(existsSync("src/app/api/consultations/free/route.ts")).toBe(false);
   });
 
   it("prefills Cal.com and carries an exact request ID into signed webhooks", () => {
@@ -54,5 +61,8 @@ describe("consultation security and provider contract", () => {
     expect(migration).toContain("'PAYMENT_SUBMITTED'");
     expect(migration).toContain("'BOOKING_RELEASED'");
     expect(migration).toContain("review_consultation_payment");
+    const offeringsMigration = readFileSync("supabase/migrations/202608260028_two_paid_consultation_offerings.sql", "utf8");
+    expect(offeringsMigration).toContain("consultation_kind in ('FIRST_TIME', 'RETURNING')");
+    expect(offeringsMigration).toContain("returning_booking_url");
   });
 });

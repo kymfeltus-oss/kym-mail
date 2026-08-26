@@ -5,6 +5,7 @@ import { consultationProofBucket, consultationProofPath, validateConsultationPro
 import { createConsultationToken, hashConsultationToken } from "@/lib/consultations/tokens";
 import { consultationSubmissionSchema } from "@/lib/consultations/validation";
 import { sendConsultationNotification } from "@/lib/consultations/notifications";
+import { consultationKindForHistory, consultationOffering } from "@/lib/consultations/offerings";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
     const form = await request.formData();
     const input = consultationSubmissionSchema.parse({
       name: form.get("name"), email: form.get("email"), phone: form.get("phone") ?? "",
-      consultationType: form.get("consultationType"), note: form.get("note") ?? "", website: form.get("website") ?? ""
+      consultationKind: form.get("consultationKind"), note: form.get("note") ?? "", website: form.get("website") ?? ""
     });
     const proofFile = form.get("paymentProof");
     if (!(proofFile instanceof File)) return NextResponse.json({ error: "Upload a PNG, JPG, JPEG, or PDF payment proof." }, { status: 400 });
@@ -29,7 +30,19 @@ export async function POST(request: NextRequest) {
     const { data: settingsRows, error: settingsError } = await database.from("consultation_settings").select("*").eq("is_active", true).limit(2);
     if (settingsError || settingsRows?.length !== 1) return NextResponse.json({ error: "Consultation intake is temporarily unavailable." }, { status: 503 });
     const settings = settingsRows[0];
-    if (input.consultationType !== settings.consultation_name) return NextResponse.json({ error: "Select the available consultation type." }, { status: 400 });
+    const { count: completedFirstTimeCount, error: historyError } = await database.from("consultation_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("owner_id", settings.owner_id)
+      .eq("client_email", input.email)
+      .eq("consultation_kind", "FIRST_TIME")
+      .eq("payment_status", "BOOKED")
+      .lt("booking_end_at", new Date().toISOString());
+    if (historyError) throw new Error("CONSULTATION_HISTORY_LOOKUP_FAILED");
+    const eligibleKind = consultationKindForHistory((completedFirstTimeCount ?? 0) > 0);
+    if (input.consultationKind !== eligibleKind) {
+      return NextResponse.json({ error: eligibleKind === "FIRST_TIME" ? "First-time clients must use the first-time consultation." : "Your completed consultation history qualifies for the returning-client consultation." }, { status: 400 });
+    }
+    const offering = consultationOffering(eligibleKind);
 
     const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     const { count } = await database.from("consultation_requests").select("id", { count: "exact", head: true }).eq("client_email", input.email).gte("created_at", since);
@@ -47,8 +60,9 @@ export async function POST(request: NextRequest) {
       client_name: input.name,
       client_email: input.email,
       client_phone: input.phone || null,
-      consultation_type: settings.consultation_name,
-      expected_amount_cents: settings.price_cents,
+      consultation_type: offering.name,
+      consultation_kind: offering.kind,
+      expected_amount_cents: offering.priceCents,
       client_note: input.note || null,
       proof_object_path: uploadedPath,
       proof_filename: proof.safeName,
@@ -61,7 +75,7 @@ export async function POST(request: NextRequest) {
     if (insertError) throw new Error("CONSULTATION_REQUEST_PERSISTENCE_FAILED");
     await database.from("consultation_events").insert({ owner_id: settings.owner_id, consultation_request_id: requestId, event_type: "PAYMENT_PROOF_SUBMITTED", actor_type: "CLIENT" });
 
-    const notification = { ownerId: settings.owner_id, requestId, clientName: input.name, clientEmail: input.email, consultationName: settings.consultation_name, expectedAmountCents: settings.price_cents };
+    const notification = { ownerId: settings.owner_id, requestId, clientName: input.name, clientEmail: input.email, consultationName: offering.name, expectedAmountCents: offering.priceCents };
     const [clientNotified, ownerNotified] = await Promise.all([
       sendConsultationNotification(database, { ...notification, kind: "PROOF_RECEIVED" }),
       sendConsultationNotification(database, { ...notification, kind: "OWNER_REVIEW" })

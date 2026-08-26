@@ -24,6 +24,8 @@ Consultation intake is public but has no anonymous table or storage grants. A se
 
 Payment approval and rejection require the existing owner session, same-origin mutation, owner-scoped lookup, and service-only atomic RPC. Approval means only “Payment proof approved by owner”; no code claims Cash App or funds verification. Booking tokens contain 256 bits of randomness, only SHA-256 is stored, they expire after 30 days, and both booking and status-token redirects reject unapproved, expired, already-booked, rejected, or cancelled requests. Cal.com links are server-resolved, provider metadata binds the booking to one request, and webhook HMAC, attendee email, booking ID, lifecycle checks, and event fingerprints prevent forged, cross-request, or duplicate updates. `CALCOM_WEBHOOK_SECRET` is server-only.
 
+Offering names, durations, and prices are centralized server-owned constants. A client-authored returning selection cannot change the amount and is rejected unless the same normalized email has a completed first-time consultation. Persisted settings control only the Cash App instructions, two Cal.com URLs, and intake-active state.
+
 ## Temporary local authentication bypass
 
 `KYM_DEV_AUTH_BYPASS=true` enables a development-only owner context. The authoritative check requires `NODE_ENV` to be non-production; production ignores the flag even if it is set. The resolver uses `KYM_DEV_OWNER_EMAIL` to find the existing owner and a server-only `SUPABASE_SERVICE_ROLE_KEY` to read through the same data client interface. Neither value enters the client bundle. The bypass has no rendered UI, badge, banner, or product-facing indicator; a structured server log is the only diagnostic.

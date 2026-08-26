@@ -10,6 +10,8 @@ export const consultationPaymentStatuses = [
 
 export type ConsultationPaymentStatus = (typeof consultationPaymentStatuses)[number];
 
+export type ConsultationKind = "FIRST_TIME" | "RETURNING";
+
 export type ConsultationSettings = {
   owner_id: string;
   consultation_name: string;
@@ -19,7 +21,8 @@ export type ConsultationSettings = {
   payment_instructions: string;
   reference_instructions: string | null;
   paid_booking_url: string;
-  free_booking_url: string;
+  free_booking_url: string | null;
+  returning_booking_url: string | null;
   scheduling_provider: "CAL_COM";
   is_active: boolean;
 };
@@ -30,6 +33,7 @@ export type ConsultationRequest = {
   client_email: string;
   client_phone: string | null;
   consultation_type: string;
+  consultation_kind: ConsultationKind;
   expected_amount_cents: number;
   client_note: string | null;
   proof_object_path: string;

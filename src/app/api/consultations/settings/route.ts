@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getOwnerContext } from "@/lib/auth/owner-context";
 import { consultationSettingsSchema } from "@/lib/consultations/validation";
+import { consultationOfferings } from "@/lib/consultations/offerings";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export async function PUT(request: NextRequest) {
@@ -14,14 +15,15 @@ export async function PUT(request: NextRequest) {
   const database = createSupabaseAdminClient();
   const { error } = await database.from("consultation_settings").upsert({
     owner_id: owner.user.id,
-    consultation_name: input.consultationName,
-    duration_minutes: input.durationMinutes,
-    price_cents: Math.round(input.priceDollars * 100),
+    consultation_name: consultationOfferings.FIRST_TIME.name,
+    duration_minutes: consultationOfferings.FIRST_TIME.durationMinutes,
+    price_cents: consultationOfferings.FIRST_TIME.priceCents,
     cash_app_handle: input.cashAppHandle,
     payment_instructions: input.paymentInstructions,
     reference_instructions: input.referenceInstructions || null,
-    paid_booking_url: input.paidBookingUrl,
-    free_booking_url: input.freeBookingUrl,
+    paid_booking_url: input.firstTimeBookingUrl,
+    returning_booking_url: input.returningBookingUrl,
+    free_booking_url: null,
     scheduling_provider: "CAL_COM",
     is_active: input.isActive
   });
