@@ -198,3 +198,6 @@ AI may execute bounded requirement extraction, interpretation, evidence-backed m
 ## Gate 3 foundation without speculative future schema
 
 Mail Core continues to store provider-stable mail-account, thread, message, history, and attachment identifiers. Gate 3 adds only nullable application-owned Project associations without changing those identifiers or making Gmail authoritative for Project state. Future migrations may add normalized associations to Contact, JobOpportunity, ResumeVersion, and outreach activity when their gates prove the use cases. Gate 3 intentionally creates none of those future models, providers, AI integrations, or interfaces.
+# Gate 7 downstream contract
+
+Hiring Intelligence and outreach are downstream of Gate 7 and remain out of scope until Gate 7 is accepted. A downstream workflow may reference only an explicitly APPROVED `tailored_resume_versions.id` and its associated owner, JobOpportunity, Project, and Career Match identifiers. It must treat the resume content as an immutable historical presentation snapshot, not a new factual authority. It may not rewrite the snapshot, promote partial evidence, read public-share tokens, expose evidence IDs to recipients, or generate/send outreach without a separate owner approval boundary.

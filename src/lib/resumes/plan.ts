@@ -2,11 +2,15 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CareerFacts } from "@/lib/resumes/career";
 import { resumePlanSchema, type CareerEntityType, type ResumePlan } from "@/lib/resumes/types";
 
-type RequirementRow = { id: string; importance: "REQUIRED" | "PREFERRED" | "CONTEXT"; original_text: string; normalized_concept: string | null; match_state: "STRONG_MATCH" | "MATCH" | "PARTIAL_MATCH" | "NO_MATCH" | "UNVERIFIED" | "NOT_APPLICABLE" };
+type RequirementRow = { id: string; importance: "REQUIRED" | "PREFERRED" | "RESPONSIBILITY" | "CONTEXT"; original_text: string; normalized_concept: string | null; match_state: "STRONG_MATCH" | "MATCH" | "PARTIAL_MATCH" | "NO_MATCH" | "UNVERIFIED" | "NOT_APPLICABLE" };
 type EvidenceRow = { requirement_id: string; evidence_type: CareerEntityType; evidence_id: string; evidence_label: string; evidence_excerpt: string; relevance_score: number };
 
-const importanceBoost = { REQUIRED: 8, PREFERRED: 4, CONTEXT: 2 } as const;
+const importanceBoost = { REQUIRED: 8, RESPONSIBILITY: 6, PREFERRED: 4, CONTEXT: 2 } as const;
 const stateBoost = { STRONG_MATCH: 8, MATCH: 5, PARTIAL_MATCH: 1, NO_MATCH: -100, UNVERIFIED: -100, NOT_APPLICABLE: -100 } as const;
+
+export function scoreResumeEvidence(relevance: number, importance: RequirementRow["importance"], state: RequirementRow["match_state"]) {
+  return Math.max(1, Math.min(100, relevance + importanceBoost[importance] + stateBoost[state]));
+}
 
 export async function buildResumePlan(database: SupabaseClient, ownerId: string, jobId: string, analysis: { id: string; version: number }, career: CareerFacts): Promise<ResumePlan> {
   const { data: requirementData, error: requirementError } = await database.from("job_analysis_requirements").select("id, importance, original_text, normalized_concept, match_state").eq("owner_id", ownerId).eq("analysis_id", analysis.id).order("sequence_number");
@@ -25,7 +29,7 @@ export async function buildResumePlan(database: SupabaseClient, ownerId: string,
     if (!requirement || !["STRONG_MATCH", "MATCH", "PARTIAL_MATCH"].includes(requirement.match_state)) continue;
     const fact = career.factsByKey.get(`${item.evidence_type}:${item.evidence_id}`);
     if (!fact) continue;
-    const score = Math.max(1, Math.min(100, item.relevance_score + importanceBoost[requirement.importance] + stateBoost[requirement.match_state]));
+    const score = scoreResumeEvidence(item.relevance_score, requirement.importance, requirement.match_state);
     const key = `${item.evidence_type}:${item.evidence_id}`;
     relevanceByFact.set(key, Math.max(score, relevanceByFact.get(key) ?? 0));
     const prior = selectedEvidence.get(key);
@@ -53,6 +57,5 @@ export async function buildResumePlan(database: SupabaseClient, ownerId: string,
     const profileFact = career.factsByKey.get(`PROFILE:${ownerId}`);
     if (profileFact) evidence.push({ ...profileFact, relevance: 50 });
   }
-  return resumePlanSchema.parse({ planVersion: "gate8.v1", jobId, analysisId: analysis.id, analysisVersion: analysis.version, targetPages: 2, experiencePlans, projectIds, skillIds, allowedJobTerms, selectedEvidence: evidence });
+  return resumePlanSchema.parse({ planVersion: "gate7.v1", jobId, analysisId: analysis.id, analysisVersion: analysis.version, targetPages: 2, experiencePlans, projectIds, skillIds, allowedJobTerms, selectedEvidence: evidence });
 }
-

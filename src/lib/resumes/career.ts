@@ -28,17 +28,18 @@ function metricText(row: Record<string, unknown>) {
 }
 
 export async function loadCareerFacts(database: SupabaseClient, ownerId: string): Promise<CareerFacts> {
+  const confirmedAuthority = ["AUTHORITATIVE", "RESOLVED"];
   const queries = await Promise.all([
-    database.from("career_profiles").select("owner_id, full_name, professional_headline, location_text, professional_summary, years_experience_claim").eq("owner_id", ownerId).single(),
-    database.from("career_organizations").select("id, canonical_name").eq("owner_id", ownerId),
-    database.from("career_titles").select("id, canonical_name").eq("owner_id", ownerId),
-    database.from("career_experiences").select("id, organization_id, client_organization_id, title_id, start_date, start_precision, end_date, end_precision, is_current, location_text, summary, completeness").eq("owner_id", ownerId).order("start_date", { ascending: false, nullsFirst: false }),
-    database.from("career_education").select("id, degree_name, field_of_study, institution_name, completed_on").eq("owner_id", ownerId),
-    database.from("career_credentials").select("id, credential_name, credential_status").eq("owner_id", ownerId),
-    database.from("career_skills").select("id, canonical_name, category").eq("owner_id", ownerId),
-    database.from("career_projects").select("id, canonical_name, experience_id, summary, business_challenge, architecture, impact").eq("owner_id", ownerId),
-    database.from("career_accomplishments").select("id, experience_id, project_id, statement").eq("owner_id", ownerId),
-    database.from("career_metrics").select("id, accomplishment_id, value_numeric, value_text, before_numeric, before_text, after_numeric, after_text, unit, currency, qualifier, scope_text").eq("owner_id", ownerId),
+    database.from("career_profiles").select("owner_id, full_name, professional_headline, location_text, professional_summary, years_experience_claim").eq("owner_id", ownerId).in("authority_status", confirmedAuthority).single(),
+    database.from("career_organizations").select("id, canonical_name").eq("owner_id", ownerId).in("authority_status", confirmedAuthority),
+    database.from("career_titles").select("id, canonical_name").eq("owner_id", ownerId).in("authority_status", confirmedAuthority),
+    database.from("career_experiences").select("id, organization_id, client_organization_id, title_id, start_date, start_precision, end_date, end_precision, is_current, location_text, summary, completeness").eq("owner_id", ownerId).in("authority_status", confirmedAuthority).order("start_date", { ascending: false, nullsFirst: false }),
+    database.from("career_education").select("id, degree_name, field_of_study, institution_name, completed_on").eq("owner_id", ownerId).in("authority_status", confirmedAuthority),
+    database.from("career_credentials").select("id, credential_name, credential_status").eq("owner_id", ownerId).in("authority_status", confirmedAuthority),
+    database.from("career_skills").select("id, canonical_name, category").eq("owner_id", ownerId).in("authority_status", confirmedAuthority),
+    database.from("career_projects").select("id, canonical_name, experience_id, summary, business_challenge, architecture, impact").eq("owner_id", ownerId).in("authority_status", confirmedAuthority),
+    database.from("career_accomplishments").select("id, experience_id, project_id, statement").eq("owner_id", ownerId).in("authority_status", confirmedAuthority),
+    database.from("career_metrics").select("id, accomplishment_id, value_numeric, value_text, before_numeric, before_text, after_numeric, after_text, unit, currency, qualifier, scope_text").eq("owner_id", ownerId).in("authority_status", confirmedAuthority),
     database.from("career_aliases").select("entity_type, entity_id, alias_text").eq("owner_id", ownerId)
   ]);
   const failed = queries.find((query) => query.error);
@@ -69,4 +70,3 @@ export async function loadCareerFacts(database: SupabaseClient, ownerId: string)
   ];
   return { profile, organizations, titles, experiences, education, credentials, skills, projects, accomplishments, metrics, aliases, factsByKey: new Map(facts.map((fact) => [`${fact.type}:${fact.id}`, fact])), fingerprint: hash({ profile, organizations, titles, experiences, education, credentials, skills, projects, accomplishments, metrics, aliases }) };
 }
-

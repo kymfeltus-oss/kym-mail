@@ -18,6 +18,7 @@ Thumbs.db
 *.tsbuildinfo
 /supabase/.temp/
 /tmp/
+/output/
 
 # credentials must never enter the repository
 client_secret_*.json

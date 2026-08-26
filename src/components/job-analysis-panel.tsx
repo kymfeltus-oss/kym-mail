@@ -110,7 +110,7 @@ function RequirementGroup({ title, items }: { title: string; items: RequirementV
   );
 }
 
-export function JobAnalysisPanel({ jobId, analysis }: { jobId: string; analysis: JobAnalysisView | null }) {
+export function JobAnalysisPanel({ jobId, analysis, projectId = null }: { jobId: string; analysis: JobAnalysisView | null; projectId?: string | null }) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -223,7 +223,7 @@ export function JobAnalysisPanel({ jobId, analysis }: { jobId: string; analysis:
                 <h3 className="flex items-center gap-2 text-lg font-semibold text-[#183A5A]"><FileText className="size-5 text-[#D95B72]" />Create a tailored resume</h3>
                 <p className="mt-1 text-sm leading-6 text-[#64748B]">Build a versioned, evidence-validated resume from this Career Match and the Master Career Profile.</p>
               </div>
-              <Link href={`/app/jobs/saved/${jobId}/resume`} className="inline-flex min-h-12 shrink-0 items-center justify-center rounded-full bg-[#183A5A] px-5 py-3 text-sm font-semibold text-white">Open Resume Studio</Link>
+              <Link href={`/app/jobs/saved/${jobId}/resume${projectId ? `?project=${projectId}` : ""}`} className="inline-flex min-h-12 shrink-0 items-center justify-center rounded-full bg-[#8D2948] px-5 py-3 text-sm font-semibold text-white">Tailor Resume</Link>
             </section>
           )}
           <div className="grid min-w-0 gap-5 lg:grid-cols-[.7fr_1.3fr]">

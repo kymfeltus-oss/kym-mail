@@ -10,7 +10,7 @@ export const resumeTextBlockSchema = z.object({
   key: z.string().regex(/^[a-z0-9][a-z0-9._:-]{2,159}$/),
   text: z.string().trim().min(2).max(3000),
   evidence: z.array(evidenceRefSchema).min(1).max(20)
-});
+}).strict();
 
 export const resumeContentSchema = z.object({
   candidate: z.object({
@@ -19,6 +19,8 @@ export const resumeContentSchema = z.object({
     location: z.string().trim().max(200).nullable()
   }),
   target: z.object({ jobTitle: z.string().trim().min(2).max(300), employer: z.string().trim().min(2).max(200) }),
+  positioning: resumeTextBlockSchema.optional(),
+  whyFit: z.array(resumeTextBlockSchema).max(4).optional(),
   summary: resumeTextBlockSchema,
   experiences: z.array(z.object({
     experienceId: z.string().uuid(),
@@ -54,11 +56,41 @@ export const resumeContentSchema = z.object({
     name: z.string().trim().min(2).max(200),
     status: z.enum(["ACTIVE", "INACTIVE", "COMPLETED", "CANDIDATE"])
   })).max(10)
-});
+}).strict();
 export type ResumeContent = z.infer<typeof resumeContentSchema>;
 
+export const masterResumeContentSchema = resumeContentSchema.omit({ target: true, positioning: true, whyFit: true });
+export type MasterResumeContent = z.infer<typeof masterResumeContentSchema>;
+
+export const resumeStrategySchema = z.object({
+  leadWith: z.array(z.string().trim().min(2).max(500)).max(6),
+  increaseEmphasis: z.array(z.string().trim().min(2).max(500)).max(8),
+  reduceEmphasis: z.array(z.string().trim().min(2).max(500)).max(8),
+  addVerifiedEvidence: z.array(z.string().trim().min(2).max(500)).max(8),
+  potentialGaps: z.array(z.string().trim().min(2).max(500)).max(8)
+});
+export type ResumeStrategy = z.infer<typeof resumeStrategySchema>;
+
+export const resumeDiffItemSchema = z.object({
+  key: z.string().regex(/^[a-z0-9][a-z0-9._:-]{2,159}$/),
+  kind: z.enum(["ADDED", "REMOVED", "REORDERED", "REWRITTEN", "EMPHASIZED", "DEEMPHASIZED"]),
+  section: z.enum(["SUMMARY", "EXPERIENCE", "ACCOMPLISHMENTS", "METRICS", "SKILLS", "PROJECTS"]),
+  label: z.string().trim().min(2).max(300),
+  before: z.string().trim().max(3000).nullable(),
+  after: z.string().trim().max(3000).nullable(),
+  contentKey: z.string().max(160).nullable()
+});
+export type ResumeDiffItem = z.infer<typeof resumeDiffItemSchema>;
+
+export const resumeDecisionSchema = z.object({
+  decision: z.enum(["APPROVED", "REJECTED", "EDITED"]),
+  editedText: z.string().trim().min(2).max(3000).optional(),
+  decidedAt: z.string().datetime()
+});
+export type ResumeDecision = z.infer<typeof resumeDecisionSchema>;
+
 export const resumePlanSchema = z.object({
-  planVersion: z.literal("gate8.v1"),
+  planVersion: z.enum(["gate7.v1", "gate8.v1"]),
   jobId: z.string().uuid(),
   analysisId: z.string().uuid(),
   analysisVersion: z.number().int().positive(),
@@ -77,7 +109,7 @@ export const resumePlanSchema = z.object({
 });
 export type ResumePlan = z.infer<typeof resumePlanSchema>;
 
-export type ResumeVersionStatus = "DRAFT" | "GENERATING" | "READY" | "FAILED" | "STALE" | "ARCHIVED";
+export type ResumeVersionStatus = "DRAFT" | "GENERATING" | "READY" | "REVIEW" | "APPROVED" | "FAILED" | "STALE" | "ARCHIVED";
 export type ResumeGenerationKind = "INITIAL" | "USER_EDIT" | "REGENERATED" | "SUMMARY_REGENERATION" | "BULLET_REGENERATION";
 
 export type ResumeView = {
@@ -91,14 +123,34 @@ export type ResumeView = {
     generationKind: ResumeGenerationKind;
     providerKey: string;
     providerMode: "DETERMINISTIC" | "AI";
+    projectId: string | null;
+    masterResumeVersionId: string | null;
     content: ResumeContent | null;
     plan: ResumePlan | null;
+    strategy: ResumeStrategy | null;
+    diff: ResumeDiffItem[];
+    reviewDecisions: Record<string, ResumeDecision>;
     validationSummary: Record<string, unknown>;
     failureCode: string | null;
     failureMessage: string | null;
     generatedAt: string | null;
+    approvedAt: string | null;
     staleAt: string | null;
     createdAt: string;
   }>;
 };
 
+export type MasterResumeView = {
+  id: string;
+  currentVersionId: string | null;
+  versions: Array<{
+    id: string;
+    versionNumber: number;
+    status: "DRAFT" | "REVIEW" | "APPROVED" | "STALE" | "ARCHIVED";
+    content: MasterResumeContent;
+    careerFingerprint: string;
+    approvedAt: string | null;
+    staleAt: string | null;
+    createdAt: string;
+  }>;
+};

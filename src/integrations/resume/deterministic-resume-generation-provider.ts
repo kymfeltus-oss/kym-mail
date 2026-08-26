@@ -20,7 +20,7 @@ export function mergeScopedRegeneration(generated: ResumeContent, prior: ResumeC
 }
 
 export class DeterministicResumeGenerationProvider implements ResumeGenerationProvider {
-  readonly key = "deterministic-gate8-v1";
+  readonly key = "deterministic-gate7-v1";
   readonly mode = "DETERMINISTIC" as const;
 
   async generate(input: ResumeGenerationInput): Promise<ResumeContent> {
@@ -52,6 +52,16 @@ export class DeterministicResumeGenerationProvider implements ResumeGenerationPr
     const content: ResumeContent = {
       candidate: { fullName: career.profile.fullName, headline: career.profile.headline, location: career.profile.location },
       target: { jobTitle: job.title, employer: job.employer },
+      positioning: {
+        key: "positioning:role",
+        text: `${career.profile.headline} positioned for ${job.title} priorities.`,
+        evidence: [ref("PROFILE", career.profile.ownerId)]
+      },
+      whyFit: plan.selectedEvidence.filter((item) => ["ACCOMPLISHMENT", "PROJECT", "EXPERIENCE"].includes(item.type)).slice(0, 3).map((item, index) => ({
+        key: `why-fit:item:${index + 1}`,
+        text: item.text.replace(/\b\d{4}-\d{2}-\d{2}\b/g, "").replace(/\s{2,}/g, " ").trim(),
+        evidence: [ref(item.type, item.id)]
+      })),
       summary: { key: "summary:professional", text: career.profile.summary, evidence: [ref("PROFILE", career.profile.ownerId)] },
       experiences,
       projects,

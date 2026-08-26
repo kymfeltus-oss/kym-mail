@@ -47,12 +47,18 @@ function validContent(): ResumeContent {
   };
 }
 
-describe("Gate 8 resume factual validation", () => {
+describe("Gate 7 resume factual validation", () => {
   it("accepts content grounded in authoritative career evidence", () => expect(validateResumeContent(validContent(), career, job).summary.passed).toBe(true));
   it("rejects an invented title", () => { const content = validContent(); content.experiences[0].title = "Chief Financial Officer"; expect(() => validateResumeContent(content, career, job)).toThrow(/Employment facts changed/); });
+  it("rejects an invented employer", () => { const content = validContent(); content.experiences[0].employer = "Invented Holdings"; expect(() => validateResumeContent(content, career, job)).toThrow(/Employment facts changed/); });
   it("rejects an invented employment date", () => { const content = validContent(); content.experiences[0].startDate = "2010-01-01"; expect(() => validateResumeContent(content, career, job)).toThrow(/Employment facts changed/); });
+  it("rejects an invented employment location", () => { const content = validContent(); content.experiences[0].location = "New York, NY"; expect(() => validateResumeContent(content, career, job)).toThrow(/Employment facts changed/); });
   it("rejects an invented metric", () => { const content = validContent(); content.experiences[0].bullets[0].text = "Led finance controls and generated $20M in savings."; expect(() => validateResumeContent(content, career, job)).toThrow(/Unverified numeric claim/); });
   it("rejects CPA credential inflation", () => { const content = validContent(); content.experiences[0].bullets[0].text = "Led finance controls as the CPA for reporting."; expect(() => validateResumeContent(content, career, job)).toThrow(/cannot be represented as completed/); });
   it("rejects an unsupported Kubernetes claim", () => { const content = validContent(); content.experiences[0].bullets[0].text = "Led finance controls and Kubernetes reporting."; expect(() => validateResumeContent(content, career, job, ["Kubernetes"])).toThrow(/Unsupported requirement/); });
+  it("rejects related evidence presented as direct experience", () => { const content = validContent(); content.projects[0].bullets[0].text = "Led a global SAP implementation and managed the deployment team."; expect(() => validateResumeContent(content, career, job)).toThrow(/not sufficiently grounded/); });
+  it("rejects extra provider response fields", () => { const content = { ...validContent(), internalScore: 100 }; expect(() => validateResumeContent(content, career, job)).toThrow(); });
   it("rejects a duplicate canonical ASC 606 project", () => { const content = validContent(); content.projects.push(structuredClone(content.projects[0])); expect(() => validateResumeContent(content, career, job)).toThrow(/only once/); });
+  it("rejects a skill placed in the wrong category", () => { const content = validContent(); content.skillGroups[0].category = "FINANCE"; expect(() => validateResumeContent(content, career, job)).toThrow(/misclassified skill/); });
+  it("rejects a duplicated authoritative skill", () => { const content = validContent(); content.skillGroups[0].skills.push(structuredClone(content.skillGroups[0].skills[0])); expect(() => validateResumeContent(content, career, job)).toThrow(/Duplicate skills/); });
 });

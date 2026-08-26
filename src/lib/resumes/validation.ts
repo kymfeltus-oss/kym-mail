@@ -11,7 +11,7 @@ function numberTokens(text: string) { return [...text.matchAll(/(?:\$\s*)?\d[\d,
 function comparableNumber(token: string) { return token.replace("percent", "%").replace("million", "m").replace("billion", "b").replace("thousand", "k"); }
 
 function editableBlocks(content: ResumeContent) {
-  return [content.summary, ...content.experiences.flatMap((item) => item.bullets), ...content.projects.flatMap((item) => item.bullets)];
+  return [content.summary, ...(content.positioning ? [content.positioning] : []), ...(content.whyFit ?? []), ...content.experiences.flatMap((item) => item.bullets), ...content.projects.flatMap((item) => item.bullets)];
 }
 
 export function validateResumeContent(contentInput: unknown, career: CareerFacts, job: { title: string; employer: string }, unsupportedTerms: string[] = []) {
@@ -28,7 +28,7 @@ export function validateResumeContent(contentInput: unknown, career: CareerFacts
     const employer = organizationById.get(fact.organizationId);
     const client = fact.clientOrganizationId ? organizationById.get(fact.clientOrganizationId) ?? null : null;
     const title = fact.titleId ? titleById.get(fact.titleId) ?? null : null;
-    if (rendered.employer !== employer || rendered.client !== client || rendered.title !== title || rendered.startDate !== fact.startDate || rendered.startPrecision !== fact.startPrecision || rendered.endDate !== fact.endDate || rendered.endPrecision !== fact.endPrecision || rendered.isCurrent !== fact.isCurrent) errors.push(`Employment facts changed for ${employer ?? rendered.employer}.`);
+    if (rendered.employer !== employer || rendered.client !== client || rendered.title !== title || rendered.startDate !== fact.startDate || rendered.startPrecision !== fact.startPrecision || rendered.endDate !== fact.endDate || rendered.endPrecision !== fact.endPrecision || rendered.isCurrent !== fact.isCurrent || rendered.location !== fact.location) errors.push(`Employment facts changed for ${employer ?? rendered.employer}.`);
   }
   if (new Set(content.experiences.map((item) => item.experienceId)).size !== content.experiences.length) errors.push("Duplicate employment records are not allowed.");
 
@@ -37,18 +37,22 @@ export function validateResumeContent(contentInput: unknown, career: CareerFacts
     const fact = educationById.get(item.educationId);
     if (!fact || item.degree !== fact.degree || item.fieldOfStudy !== fact.fieldOfStudy || item.institution !== fact.institution || item.completedOn !== fact.completedOn) errors.push("Education must match the Master Career Profile exactly.");
   }
-  if (content.education.length !== career.education.length) errors.push("Authoritative education records cannot be omitted or added.");
+  const educationIds = content.education.map((item) => item.educationId);
+  if (new Set(educationIds).size !== educationIds.length || content.education.length !== career.education.length || career.education.some((item) => !educationIds.includes(item.id))) errors.push("Authoritative education records cannot be omitted, duplicated, or added.");
   const credentialById = new Map(career.credentials.map((item) => [item.id, item]));
   for (const item of content.credentials) {
     const fact = credentialById.get(item.credentialId);
     if (!fact || item.name !== fact.name || item.status !== fact.status) errors.push("Credential status must match the Master Career Profile exactly.");
   }
-  if (content.credentials.length !== career.credentials.length) errors.push("Authoritative credentials cannot be omitted or added.");
+  const credentialIds = content.credentials.map((item) => item.credentialId);
+  if (new Set(credentialIds).size !== credentialIds.length || content.credentials.length !== career.credentials.length || career.credentials.some((item) => !credentialIds.includes(item.id))) errors.push("Authoritative credentials cannot be omitted, duplicated, or added.");
   const skillById = new Map(career.skills.map((item) => [item.id, item]));
-  for (const item of content.skillGroups.flatMap((group) => group.skills)) {
+  const renderedSkills = content.skillGroups.flatMap((group) => group.skills.map((item) => ({ ...item, category: group.category })));
+  for (const item of renderedSkills) {
     const fact = skillById.get(item.skillId);
-    if (!fact || item.name !== fact.name) errors.push(`Unsupported skill: ${item.name}.`);
+    if (!fact || item.name !== fact.name || item.category !== fact.category) errors.push(`Unsupported or misclassified skill: ${item.name}.`);
   }
+  if (new Set(renderedSkills.map((item) => item.skillId)).size !== renderedSkills.length) errors.push("Duplicate skills are not allowed.");
   const projectById = new Map(career.projects.map((item) => [item.id, item]));
   for (const item of content.projects) {
     const fact = projectById.get(item.projectId);
@@ -56,7 +60,7 @@ export function validateResumeContent(contentInput: unknown, career: CareerFacts
   }
   if (new Set(content.projects.map((item) => item.projectId)).size !== content.projects.length) errors.push("A canonical project may appear only once.");
 
-  const allEditableText = editableBlocks(content).map((block) => block.text).join("\n");
+  const allEditableText = editableBlocks(content).filter((block) => block.key !== "positioning:role").map((block) => block.text).join("\n");
   for (const term of unsupportedTerms.filter((item) => item.length >= 3)) {
     if (new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(allEditableText)) errors.push(`Unsupported requirement cannot be added as experience: ${term}.`);
   }
@@ -67,7 +71,7 @@ export function validateResumeContent(contentInput: unknown, career: CareerFacts
   for (const block of editableBlocks(content)) {
     const evidence = block.evidence.map((item) => career.factsByKey.get(`${item.type}:${item.id}`)).filter((item): item is NonNullable<typeof item> => Boolean(item));
     if (evidence.length !== block.evidence.length) { errors.push(`Evidence is missing for ${block.key}.`); continue; }
-    const source = evidence.map((item) => item.text).join(" ");
+    const source = [evidence.map((item) => item.text).join(" "), ...(block.key === "positioning:role" ? [job.title, job.employer] : [])].join(" ");
     const sourceWords = new Set(words(source));
     const blockWords = words(block.text);
     const overlap = blockWords.length ? blockWords.filter((word) => sourceWords.has(word)).length / blockWords.length : 0;
@@ -78,4 +82,3 @@ export function validateResumeContent(contentInput: unknown, career: CareerFacts
   if (errors.length) throw new ResumeValidationError("RESUME_FACT_VALIDATION_FAILED", errors[0]);
   return { content, summary: { passed: true, checks: ["identity", "employment", "education", "credentials", "skills", "projects", "evidence", "metrics", "unsupported-requirements"], checkedAt: new Date().toISOString() } };
 }
-

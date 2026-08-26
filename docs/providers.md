@@ -20,6 +20,10 @@ Adzuna credentials are `ADZUNA_APP_ID` and `ADZUNA_APP_KEY`, server-only. The [p
 
 The bundled `public/adzuna-logo.svg` is Adzuna's official press asset and is used only to satisfy the provider's required listing attribution.
 
+## Gate 7 resume generation boundary
+
+`ResumeGenerationProvider` is a bounded presentation contract; it does not own facts, workflow state, approval, sharing, or persistence. Gate 7 uses `DeterministicResumeGenerationProvider` (`deterministic-gate7-v1`) and sends only the selected plan and verified evidence. The application validates strict structured output, rejects extra fields, re-resolves every evidence ID, and rejects invented facts or metrics before persistence. Unchanged career, analysis, Master Resume, Project, action, and scope inputs reuse the persisted request fingerprint, so refresh and duplicate requests do not spend provider calls. No external AI API is required or configured for Gate 7.
+
 ## Job analysis provider
 
 Gate 6B injects `JobAnalysisProvider`. V2 uses `DeterministicJobAnalysisProvider`, which extracts structured requirements from the stored job description and ranks candidate Master Career Profile evidence without external AI spend. It never assigns match state, the overall percentage, or persistence. Structured output is Zod-validated, original requirement wording must appear in the job description, and evidence IDs must resolve to loaded confirmed-authority Gate 6 records. Job descriptions are untrusted: instruction-like content is inert, cannot change application rules, and is rejected as a requirement. A future LLM adapter may implement the same bounded contract; application logic still owns scoring, `NO_MATCH` versus `UNVERIFIED`, material gaps, source grounding, and stale/re-analysis rules.
