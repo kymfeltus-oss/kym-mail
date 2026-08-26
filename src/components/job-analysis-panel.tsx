@@ -137,6 +137,7 @@ export function JobAnalysisPanel({ jobId, analysis }: { jobId: string; analysis:
   const materialGaps = analysis?.summary.materialGaps ?? [];
   const required = analysis?.requirements.filter((requirement) => requirement.importance === "REQUIRED") ?? [];
   const preferred = analysis?.requirements.filter((requirement) => requirement.importance === "PREFERRED") ?? [];
+  const responsibilities = analysis?.requirements.filter((requirement) => requirement.importance === "RESPONSIBILITY") ?? [];
   const context = analysis?.requirements.filter((requirement) => requirement.importance === "CONTEXT") ?? [];
   const skillsSystems = analysis?.requirements.filter((requirement) => ["SKILL", "TECHNOLOGY", "SYSTEM", "DATA"].includes(requirement.category)) ?? [];
   const partial = analysis?.requirements.filter((requirement) => requirement.matchState === "PARTIAL_MATCH") ?? [];
@@ -144,6 +145,24 @@ export function JobAnalysisPanel({ jobId, analysis }: { jobId: string; analysis:
   const noMatch = analysis?.requirements.filter((requirement) => requirement.matchState === "NO_MATCH") ?? [];
   const careerEvidence = [...new Map((analysis?.requirements ?? []).flatMap((requirement) => requirement.evidence).map((item) => [item.label, item])).values()].slice(0, 8);
   const breakdown = analysis?.summary.scoreBreakdown;
+  const positive = analysis?.requirements.filter((requirement) => requirement.matchState === "STRONG_MATCH" || requirement.matchState === "MATCH") ?? [];
+  const whyYouMatch = analysis?.summary.whyYouMatch?.length
+    ? analysis.summary.whyYouMatch
+    : positive.slice(0, 6).map((requirement) => `${requirement.originalText}${requirement.evidence[0] ? ` — supported by ${requirement.evidence[0].label}.` : ""}`);
+  const whereYouDont = analysis?.summary.whereYouDont?.length
+    ? analysis.summary.whereYouDont
+    : analysis?.requirements.filter((requirement) => requirement.matchState === "NO_MATCH" || requirement.matchState === "UNVERIFIED" || (requirement.isMaterial && requirement.matchState === "PARTIAL_MATCH")).slice(0, 6).map((requirement) => `${requirement.originalText} — ${requirement.explanation}`) ?? [];
+  const resumeUnderselling = analysis?.summary.resumeUnderselling?.length
+    ? analysis.summary.resumeUnderselling
+    : [...new Set(positive.flatMap((requirement) => requirement.evidence.filter((item) => item.relevanceScore >= 62 && ["PROJECT", "ACCOMPLISHMENT", "METRIC"].includes(item.type)).map((item) => `${item.label}: ${item.excerpt}`)))].slice(0, 5);
+  const recommendedResumeStrategy = analysis?.summary.recommendedResumeStrategy?.length
+    ? analysis.summary.recommendedResumeStrategy
+    : [
+      positive[0]?.evidence[0] ? `Lead with ${positive[0].evidence[0].label}, which directly supports a high-value requirement.` : null,
+      "Mirror the job's terminology only where confirmed Master Career Profile evidence supports it.",
+      resumeUnderselling.length ? "Elevate the strongest authoritative project, accomplishment, and metric evidence without changing or inventing facts." : null,
+      whereYouDont.length ? "Do not claim unsupported qualifications; distinguish unknown requirements from verified gaps." : null
+    ].filter((item): item is string => Boolean(item));
   const analyzedAt = formatTimestamp(analysis?.completedAt ?? analysis?.lastSuccessfulCompletedAt);
   const busy = submitting || analysis?.status === "ANALYZING";
 
@@ -169,7 +188,7 @@ export function JobAnalysisPanel({ jobId, analysis }: { jobId: string; analysis:
           <div className="rounded-3xl border border-dashed border-[#E7B8C1] bg-[#FFF8F8] p-6 text-center">
             <Gauge className="mx-auto size-8 text-[#D95B72]" />
             <h3 className="mt-3 text-lg font-semibold text-[#183A5A]">Not analyzed yet</h3>
-            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#64748B]">Analyze the complete available description to extract structured requirements, score them against Gate 6 career evidence, and persist the result.</p>
+            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#64748B]">Analyze the complete available description to extract structured requirements, score them against confirmed Master Career Profile evidence, and persist the result.</p>
           </div>
         </div>
       )}
@@ -233,14 +252,15 @@ export function JobAnalysisPanel({ jobId, analysis }: { jobId: string; analysis:
               <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#D95B72]">Score explanation</p>
               <h3 className="mt-1 text-xl font-semibold text-[#183A5A]">Where {analysis.overallScore ?? 0}% came from</h3>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-[#64748B]">{breakdown.explanation}</p>
-              <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-3">
-                {(["REQUIRED", "PREFERRED", "CONTEXT"] as const).map((importance) => {
-                  const slice = breakdown.byImportance[importance];
+              <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {(["REQUIRED", "RESPONSIBILITY", "PREFERRED", "CONTEXT"] as const).map((importance) => {
+                  const slice = breakdown.byImportance[importance] ?? { count: 0, earnedPoints: 0, possiblePoints: 0, score: null };
+                  const weight = breakdown.weights[importance] ?? ({ REQUIRED: 5, RESPONSIBILITY: 3, PREFERRED: 2, CONTEXT: 1 } as const)[importance];
                   return (
                     <article key={importance} className="rounded-2xl border border-[#E8E2E3] bg-white p-4">
                       <p className="text-[10px] font-semibold uppercase tracking-[.12em] text-[#D95B72]">{importance.toLowerCase()}</p>
                       <p className="mt-2 text-2xl font-semibold text-[#183A5A]">{slice.score === null ? "—" : `${slice.score}%`}</p>
-                      <p className="mt-1 text-xs leading-5 text-[#64748B]">{slice.earnedPoints}/{slice.possiblePoints} weighted points · {slice.count} requirements · weight {breakdown.weights[importance]}</p>
+                      <p className="mt-1 text-xs leading-5 text-[#64748B]">{slice.earnedPoints}/{slice.possiblePoints} weighted points · {slice.count} requirements · weight {weight}</p>
                     </article>
                   );
                 })}
@@ -260,8 +280,34 @@ export function JobAnalysisPanel({ jobId, analysis }: { jobId: string; analysis:
 
           <RequirementGroup title="Required qualifications" items={required} />
           <RequirementGroup title="Preferred qualifications" items={preferred} />
-          <RequirementGroup title="Additional responsibilities" items={context} />
+          <RequirementGroup title="Responsibilities" items={responsibilities} />
+          <RequirementGroup title="Role and company context" items={context} />
           <RequirementGroup title="Skills, systems, and data" items={skillsSystems} />
+
+          <section className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#D95B72]">Why screen</p>
+            <h3 className="mt-1 text-xl font-semibold text-[#183A5A]">What the evidence means for this application</h3>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[#64748B]">These recommendations are derived from persisted requirements and confirmed Master Career Profile records. They do not generate or rewrite a résumé.</p>
+            <div className="mt-5 grid min-w-0 gap-4 lg:grid-cols-2">
+              <article className="min-w-0 rounded-3xl border border-[#CFE8DD] bg-[#F5FCF8] p-5">
+                <h4 className="text-base font-semibold text-[#183A5A]">Why you match</h4>
+                {whyYouMatch.length ? <ul className="mt-3 space-y-3">{whyYouMatch.map((item) => <li key={item} className="break-words text-sm leading-6 text-[#465B70]">{item}</li>)}</ul> : <p className="mt-3 text-sm leading-6 text-[#64748B]">No positive match is supported strongly enough to present.</p>}
+              </article>
+              <article className="min-w-0 rounded-3xl border border-[#F0CDD4] bg-[#FFF8F8] p-5">
+                <h4 className="text-base font-semibold text-[#183A5A]">Where you don&apos;t</h4>
+                {whereYouDont.length ? <ul className="mt-3 space-y-3">{whereYouDont.map((item) => <li key={item} className="break-words text-sm leading-6 text-[#465B70]">{item}</li>)}</ul> : <p className="mt-3 text-sm leading-6 text-[#64748B]">No verified gaps or unresolved requirements were identified.</p>}
+              </article>
+              <article className="min-w-0 rounded-3xl border border-[#E7B8C1] bg-white p-5">
+                <h4 className="text-base font-semibold text-[#183A5A]">Resume is underselling you</h4>
+                <p className="mt-2 text-xs leading-5 text-[#64748B]">Review whether these especially relevant authoritative facts are prominent in the current résumé. KYM Mail does not assume they are absent.</p>
+                {resumeUnderselling.length ? <ul className="mt-3 space-y-3">{resumeUnderselling.map((item) => <li key={item} className="break-words text-sm leading-6 text-[#465B70]">{item}</li>)}</ul> : <p className="mt-3 text-sm leading-6 text-[#64748B]">No project, accomplishment, or metric met the deterministic relevance threshold for this section.</p>}
+              </article>
+              <article className="min-w-0 rounded-3xl bg-[#183A5A] p-5 text-white">
+                <h4 className="text-base font-semibold">Recommended resume strategy</h4>
+                <ol className="mt-3 space-y-3">{recommendedResumeStrategy.map((item, index) => <li key={item} className="break-words text-sm leading-6 text-[#DDE8F0]"><span className="mr-2 font-semibold text-[#F7DDE1]">{index + 1}.</span>{item}</li>)}</ol>
+              </article>
+            </div>
+          </section>
 
           <section>
             <h3 className="text-xl font-semibold text-[#183A5A]">Relevant career evidence</h3>

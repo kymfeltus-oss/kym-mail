@@ -25,6 +25,8 @@ Career imports are an owner-approved administrative operation. Validate an intak
 
 Gate 6A adds the low-cost source-to-authority workflow around that profile. The two reviewed resume extractions are persisted once by source SHA-256; deterministic comparison creates candidate facts, auto-confirms only exact low-risk dual-source technology/system facts, and sends conflicts or unique claims to one owner-only Review Needed queue. Owner resolutions and edits create numbered fact versions and provenance. A later import may suggest a change but cannot silently replace `OWNER_CONFIRMED` data. Resume PDFs remain outside the repository and are never served by the app.
 
+Gate 6B adds persisted Career Match intelligence to a Saved Job. The deterministic v2 analyzer independently classifies `REQUIRED`, `PREFERRED`, `RESPONSIBILITY`, and `CONTEXT` requirements, grounds every requirement in the stored job description, and permits positive evidence links only to `AUTHORITATIVE` or owner-`RESOLVED` Master Career Profile records. The WHY screen explains supported matches, genuine gaps, potentially under-emphasized authoritative evidence, and a factual résumé strategy without generating a résumé or calling an external AI service. The 12 unresolved Gate 6A review candidates remain excluded.
+
 Quality commands: `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, and `npm audit`.
 
 During local UI development, the temporary server-only auth bypass can be enabled with `KYM_DEV_AUTH_BYPASS=true`; see `docs/security.md`. It is forcibly disabled in production and does not change database RLS.

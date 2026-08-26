@@ -1,11 +1,11 @@
 import { createHash } from "crypto";
 import { z } from "zod";
 
-export const JOB_ANALYZER_VERSION = "deterministic-evidence-v1";
-export const SCORING_MODEL_ID = "weighted-requirement-v1";
+export const JOB_ANALYZER_VERSION = "deterministic-evidence-v2";
+export const SCORING_MODEL_ID = "weighted-requirement-v2";
 
 export type JobAnalysisStatus = "NOT_ANALYZED" | "ANALYZING" | "COMPLETE" | "FAILED" | "STALE";
-export type RequirementImportance = "REQUIRED" | "PREFERRED" | "CONTEXT";
+export type RequirementImportance = "REQUIRED" | "PREFERRED" | "RESPONSIBILITY" | "CONTEXT";
 export type RequirementCategory =
   | "RESPONSIBILITY"
   | "SKILL"
@@ -41,7 +41,7 @@ export const MATCH_STATE_CRITERIA: Record<RequirementMatchState, string> = {
   NOT_APPLICABLE: "The item is legal, compensation, benefits, or authorization language and is excluded from scoring."
 };
 
-export const IMPORTANCE_WEIGHTS: Record<RequirementImportance, number> = { REQUIRED: 5, PREFERRED: 2, CONTEXT: 3 };
+export const IMPORTANCE_WEIGHTS: Record<RequirementImportance, number> = { REQUIRED: 5, PREFERRED: 2, RESPONSIBILITY: 3, CONTEXT: 1 };
 export const MATCH_STATE_VALUES: Record<RequirementMatchState, number> = {
   STRONG_MATCH: 1,
   MATCH: 0.8,
@@ -126,6 +126,7 @@ export type JobAnalysisResult = {
     requirementCount: number;
     requiredCount: number;
     preferredCount: number;
+    responsibilityCount: number;
     strongMatchCount: number;
     matchCount: number;
     partialMatchCount: number;
@@ -137,6 +138,10 @@ export type JobAnalysisResult = {
     gaps: string[];
     materialGaps: string[];
     scoreExplanation: string;
+    whyYouMatch: string[];
+    whereYouDont: string[];
+    resumeUnderselling: string[];
+    recommendedResumeStrategy: string[];
   };
   jobSnapshot: {
     title: string;
@@ -327,8 +332,9 @@ function requirementCategory(text: string): RequirementCategory {
 
 function requirementImportance(text: string, section: RequirementImportance): RequirementImportance {
   if (preferredPattern.test(text)) return "PREFERRED";
-  if (/\b(required|must|minimum|need to|responsible for|you will|what you'?ll do|qualifications)\b/i.test(text)) return "REQUIRED";
-  return section === "CONTEXT" ? "REQUIRED" : section;
+  if (/\b(required|must|minimum|need to)\b/i.test(text)) return "REQUIRED";
+  if (section === "RESPONSIBILITY" || /\b(responsible for|you will|what you'?ll do|duties include)\b/i.test(text)) return "RESPONSIBILITY";
+  return section;
 }
 
 function looksLikeRequirement(text: string) {
@@ -361,7 +367,11 @@ function splitRequirementText(description: string) {
       section = "PREFERRED";
       continue;
     }
-    if (/^(required|minimum|basic)?\s*(qualifications|requirements|responsibilities|what you.ll do|duties)\s*:?”?$/i.test(line)) {
+    if (/^(responsibilities|what you.ll do|duties)\s*:?”?$/i.test(line)) {
+      section = "RESPONSIBILITY";
+      continue;
+    }
+    if (/^(required|minimum|basic)?\s*(qualifications|requirements)\s*:?”?$/i.test(line)) {
       section = "REQUIRED";
       continue;
     }
@@ -649,6 +659,7 @@ export function buildScoreBreakdown(requirements: MatchedRequirement[]): ScoreBr
   const byImportance = {
     REQUIRED: sliceFor(scored.filter((item) => item.importance === "REQUIRED")),
     PREFERRED: sliceFor(scored.filter((item) => item.importance === "PREFERRED")),
+    RESPONSIBILITY: sliceFor(scored.filter((item) => item.importance === "RESPONSIBILITY")),
     CONTEXT: sliceFor(scored.filter((item) => item.importance === "CONTEXT"))
   };
   const byCategory: ScoreBreakdown["byCategory"] = {};
@@ -659,9 +670,10 @@ export function buildScoreBreakdown(requirements: MatchedRequirement[]): ScoreBr
   for (const requirement of requirements) byState[requirement.matchState] += 1;
   const required = byImportance.REQUIRED;
   const preferred = byImportance.PREFERRED;
+  const responsibilities = byImportance.RESPONSIBILITY;
   const unverifiedCount = byState.UNVERIFIED;
   const explanation = possiblePoints
-    ? `Overall match is ${overallScore}% because ${earnedPoints} of ${possiblePoints} weighted points were earned from verifiable requirements. Required qualifications use weight ${IMPORTANCE_WEIGHTS.REQUIRED} and earned ${required.earnedPoints}/${required.possiblePoints || 0}. Preferred qualifications use weight ${IMPORTANCE_WEIGHTS.PREFERRED} and earned ${preferred.earnedPoints}/${preferred.possiblePoints || 0}. Strong match counts as 100% of a requirement's weight, match 80%, partial 45%, and a verified gap 0%. ${unverifiedCount} unverified requirement${unverifiedCount === 1 ? "" : "s"} ${unverifiedCount === 1 ? "was" : "were"} excluded from the percentage.`
+    ? `Overall match is ${overallScore}% because ${earnedPoints} of ${possiblePoints} weighted points were earned from verifiable requirements. Required qualifications use weight ${IMPORTANCE_WEIGHTS.REQUIRED} and earned ${required.earnedPoints}/${required.possiblePoints || 0}. Responsibilities use weight ${IMPORTANCE_WEIGHTS.RESPONSIBILITY} and earned ${responsibilities.earnedPoints}/${responsibilities.possiblePoints || 0}. Preferred qualifications use weight ${IMPORTANCE_WEIGHTS.PREFERRED} and earned ${preferred.earnedPoints}/${preferred.possiblePoints || 0}. Strong match counts as 100% of a requirement's weight, match 80%, partial 45%, and a verified gap 0%. ${unverifiedCount} unverified requirement${unverifiedCount === 1 ? "" : "s"} ${unverifiedCount === 1 ? "was" : "were"} excluded from the percentage.`
     : "No scorable requirements were present.";
   return {
     model: SCORING_MODEL_ID,
@@ -675,6 +687,39 @@ export function buildScoreBreakdown(requirements: MatchedRequirement[]): ScoreBr
     byCategory,
     byState,
     explanation
+  };
+}
+
+function uniqueLimited(values: string[], limit: number) {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))].slice(0, limit);
+}
+
+export function buildCareerMatchInsights(requirements: MatchedRequirement[]) {
+  const positive = requirements
+    .filter((item) => item.matchState === "STRONG_MATCH" || item.matchState === "MATCH")
+    .sort((left, right) => right.matchConfidence - left.matchConfidence);
+  const missing = requirements
+    .filter((item) => item.matchState === "NO_MATCH" || item.matchState === "UNVERIFIED" || (item.isMaterial && item.matchState === "PARTIAL_MATCH"));
+  const whyYouMatch = uniqueLimited(positive.map((item) => {
+    const labels = uniqueLimited(item.evidence.map((match) => match.evidence.label), 3);
+    return labels.length ? `${item.originalText} — supported by ${labels.join(", ")}.` : item.originalText;
+  }), 6);
+  const whereYouDont = uniqueLimited(missing.map((item) => `${item.originalText} — ${item.explanation}`), 6);
+  const resumeUnderselling = uniqueLimited(positive.flatMap((item) => item.evidence
+    .filter((match) => match.relevanceScore >= 62 && ["PROJECT", "ACCOMPLISHMENT", "METRIC"].includes(match.evidence.type))
+    .map((match) => `${match.evidence.label}: ${match.evidence.text}`)), 5);
+  const supportedCategories = uniqueLimited(positive.map((item) => item.category.toLowerCase().replaceAll("_", " ")), 4);
+  const strategy: string[] = [];
+  if (positive[0]?.evidence[0]) strategy.push(`Lead with ${positive[0].evidence[0].evidence.label} because it directly supports a high-value requirement.`);
+  if (supportedCategories.length) strategy.push(`Prioritize verified ${supportedCategories.join(", ")} evidence and mirror the job's exact terminology only where the Master Career Profile supports it.`);
+  if (resumeUnderselling.length) strategy.push("Elevate the strongest authoritative project, accomplishment, and metric evidence; keep every number tied to its persisted career record.");
+  if (missing.length) strategy.push("Do not claim unsupported qualifications. Address material gaps truthfully and distinguish an unknown from a verified absence.");
+  if (!strategy.length) strategy.push("Use only confirmed Master Career Profile evidence and preserve the job description's distinction between required, preferred, responsibility, and context items.");
+  return {
+    whyYouMatch,
+    whereYouDont,
+    resumeUnderselling,
+    recommendedResumeStrategy: uniqueLimited(strategy, 5)
   };
 }
 
@@ -702,6 +747,7 @@ export function analyzeJobDescription(
     .slice(0, 5);
   const gaps = requirements.filter((item) => item.matchState === "NO_MATCH").slice(0, 8);
   const materialGaps = requirements.filter((item) => item.isMaterial && (item.matchState === "NO_MATCH" || item.matchState === "UNVERIFIED" || item.matchState === "PARTIAL_MATCH"));
+  const insights = buildCareerMatchInsights(requirements);
   return {
     requirements,
     overallScore: scoreBreakdown.overallScore,
@@ -710,6 +756,7 @@ export function analyzeJobDescription(
       requirementCount: requirements.length,
       requiredCount: requirements.filter((item) => item.importance === "REQUIRED").length,
       preferredCount: requirements.filter((item) => item.importance === "PREFERRED").length,
+      responsibilityCount: requirements.filter((item) => item.importance === "RESPONSIBILITY").length,
       strongMatchCount: requirements.filter((item) => item.matchState === "STRONG_MATCH").length,
       matchCount: requirements.filter((item) => item.matchState === "MATCH").length,
       partialMatchCount: requirements.filter((item) => item.matchState === "PARTIAL_MATCH").length,
@@ -720,7 +767,8 @@ export function analyzeJobDescription(
       strongestAreas: strongest.map((item) => item.originalText),
       gaps: gaps.map((item) => item.originalText),
       materialGaps: materialGaps.map((item) => item.originalText),
-      scoreExplanation: scoreBreakdown.explanation
+      scoreExplanation: scoreBreakdown.explanation,
+      ...insights
     },
     jobSnapshot: { title: job.title, employer: job.employer, location: job.location, seniority: detectSeniority(job.title, job.description) }
   };
@@ -739,7 +787,7 @@ export function matchClassification(score: number) {
 
 export const extractedRequirementSchema = z.object({
   sequenceNumber: z.number().int().min(1).max(200),
-  importance: z.enum(["REQUIRED", "PREFERRED", "CONTEXT"]),
+  importance: z.enum(["REQUIRED", "PREFERRED", "RESPONSIBILITY", "CONTEXT"]),
   category: z.enum(["RESPONSIBILITY", "SKILL", "TECHNOLOGY", "SYSTEM", "ACCOUNTING", "FINANCE", "DATA", "EDUCATION", "CERTIFICATION", "EXPERIENCE", "LEADERSHIP", "INDUSTRY", "OTHER"]),
   originalText: z.string().trim().min(3).max(2000),
   normalizedText: z.string().trim().min(3).max(2000),

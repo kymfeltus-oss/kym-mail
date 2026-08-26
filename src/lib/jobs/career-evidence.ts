@@ -3,6 +3,7 @@ import type { CareerEvidence } from "@/lib/jobs/analysis";
 import { JobAnalysisInputError } from "@/lib/jobs/analysis";
 
 type Row = Record<string, unknown>;
+const confirmedAuthority = new Set(["AUTHORITATIVE", "RESOLVED"]);
 
 function stringValue(value: unknown) {
   return typeof value === "string" ? value : "";
@@ -50,16 +51,16 @@ export async function careerProfileExists(database: SupabaseClient, ownerId: str
 
 export async function loadCareerEvidence(database: SupabaseClient, ownerId: string): Promise<CareerEvidence[]> {
   const [profiles, organizations, titles, experiences, education, credentials, skills, projects, accomplishments, metrics, aliases, experienceSkills, projectSkills] = await Promise.all([
-    checked(database.from("career_profiles").select("owner_id, full_name, professional_headline, professional_summary, years_experience_claim, authority_status, updated_at").eq("owner_id", ownerId)),
+    checked(database.from("career_profiles").select("owner_id, full_name, professional_headline, professional_summary, years_experience_claim, authority_status, updated_at").eq("owner_id", ownerId).in("authority_status", [...confirmedAuthority])),
     checked(database.from("career_organizations").select("id, canonical_name, authority_status, updated_at").eq("owner_id", ownerId)),
     checked(database.from("career_titles").select("id, canonical_name, authority_status, updated_at").eq("owner_id", ownerId)),
-    checked(database.from("career_experiences").select("id, organization_id, client_organization_id, title_id, start_date, end_date, is_current, summary, authority_status, updated_at").eq("owner_id", ownerId)),
-    checked(database.from("career_education").select("id, degree_name, field_of_study, institution_name, authority_status, updated_at").eq("owner_id", ownerId)),
-    checked(database.from("career_credentials").select("id, credential_name, credential_status, issuing_organization, authority_status, updated_at").eq("owner_id", ownerId)),
-    checked(database.from("career_skills").select("id, canonical_name, category, authority_status, updated_at").eq("owner_id", ownerId)),
-    checked(database.from("career_projects").select("id, canonical_name, project_kind, summary, business_challenge, architecture, impact, authority_status, updated_at").eq("owner_id", ownerId)),
-    checked(database.from("career_accomplishments").select("id, category, statement, authority_status, updated_at").eq("owner_id", ownerId)),
-    checked(database.from("career_metrics").select("id, accomplishment_id, metric_type, value_numeric, value_text, before_numeric, before_text, after_numeric, after_text, unit, currency, qualifier, scope_text, authority_status, updated_at").eq("owner_id", ownerId)),
+    checked(database.from("career_experiences").select("id, organization_id, client_organization_id, title_id, start_date, end_date, is_current, summary, authority_status, updated_at").eq("owner_id", ownerId).in("authority_status", [...confirmedAuthority])),
+    checked(database.from("career_education").select("id, degree_name, field_of_study, institution_name, authority_status, updated_at").eq("owner_id", ownerId).in("authority_status", [...confirmedAuthority])),
+    checked(database.from("career_credentials").select("id, credential_name, credential_status, issuing_organization, authority_status, updated_at").eq("owner_id", ownerId).in("authority_status", [...confirmedAuthority])),
+    checked(database.from("career_skills").select("id, canonical_name, category, authority_status, updated_at").eq("owner_id", ownerId).in("authority_status", [...confirmedAuthority])),
+    checked(database.from("career_projects").select("id, canonical_name, project_kind, summary, business_challenge, architecture, impact, authority_status, updated_at").eq("owner_id", ownerId).in("authority_status", [...confirmedAuthority])),
+    checked(database.from("career_accomplishments").select("id, category, statement, authority_status, updated_at").eq("owner_id", ownerId).in("authority_status", [...confirmedAuthority])),
+    checked(database.from("career_metrics").select("id, accomplishment_id, metric_type, value_numeric, value_text, before_numeric, before_text, after_numeric, after_text, unit, currency, qualifier, scope_text, authority_status, updated_at").eq("owner_id", ownerId).in("authority_status", [...confirmedAuthority])),
     checked(database.from("career_aliases").select("entity_type, entity_id, alias_text").eq("owner_id", ownerId)),
     checked(database.from("career_experience_skills").select("experience_id, skill_id").eq("owner_id", ownerId)),
     checked(database.from("career_project_skills").select("project_id, skill_id").eq("owner_id", ownerId))
@@ -218,5 +219,5 @@ export async function loadCareerEvidence(database: SupabaseClient, ownerId: stri
       updatedAt: dateValue(metric.updated_at)
     });
   }
-  return evidence.filter((item) => item.id && item.label && item.text.length >= 3);
+  return evidence.filter((item) => item.id && item.label && item.text.length >= 3 && confirmedAuthority.has(String(item.metadata?.authorityStatus)));
 }

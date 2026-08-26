@@ -34,6 +34,7 @@ export type JobAnalysisSummaryView = {
   requirementCount?: number;
   requiredCount?: number;
   preferredCount?: number;
+  responsibilityCount?: number;
   strongMatchCount?: number;
   matchCount?: number;
   partialMatchCount?: number;
@@ -46,6 +47,10 @@ export type JobAnalysisSummaryView = {
   materialGaps?: string[];
   scoreExplanation?: string;
   scoreBreakdown?: ScoreBreakdown;
+  whyYouMatch?: string[];
+  whereYouDont?: string[];
+  resumeUnderselling?: string[];
+  recommendedResumeStrategy?: string[];
 };
 
 export type JobAnalysisView = {

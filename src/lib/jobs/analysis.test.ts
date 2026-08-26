@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   JobAnalysisInputError,
   analyzeJobDescription,
+  buildCareerMatchInsights,
   buildScoreBreakdown,
   calculateOverallMatch,
   classifyJobDescription,
@@ -87,6 +88,14 @@ describe("job description extraction", () => {
     expect(requirements.some((item) => /Kubernetes/i.test(item.originalText))).toBe(true);
   });
 
+  it("classifies responsibilities independently from required, preferred, and context items", () => {
+    const description = `${financeDescription}\nResponsibilities\nPartner with business leaders to drive operating decisions.\nAbout us\nWe are a growing enterprise organization.`;
+    const requirements = extractJobRequirements(description);
+    const responsibility = requirements.find((item) => /Partner with business leaders/i.test(item.originalText));
+    expect(responsibility?.importance).toBe("RESPONSIBILITY");
+    expect(responsibility?.category).toMatch(/RESPONSIBILITY|LEADERSHIP/);
+  });
+
   it("does not treat related accounting concepts as identical", () => {
     expect(detectNormalizedConcept("ASC 606")).toBe("asc606");
     expect(detectNormalizedConcept("Revenue Recognition")).toBe("revenue-recognition");
@@ -140,7 +149,7 @@ describe("deterministic scoring", () => {
     const expected = calculateOverallMatch(scored);
     expect(breakdown.overallScore).toBe(expected);
     expect(breakdown.earnedPoints + breakdown.byImportance.REQUIRED.earnedPoints - breakdown.byImportance.REQUIRED.earnedPoints).toBe(breakdown.earnedPoints);
-    const importanceEarned = breakdown.byImportance.REQUIRED.earnedPoints + breakdown.byImportance.PREFERRED.earnedPoints + breakdown.byImportance.CONTEXT.earnedPoints;
+    const importanceEarned = breakdown.byImportance.REQUIRED.earnedPoints + breakdown.byImportance.PREFERRED.earnedPoints + breakdown.byImportance.RESPONSIBILITY.earnedPoints + breakdown.byImportance.CONTEXT.earnedPoints;
     expect(importanceEarned).toBeCloseTo(breakdown.earnedPoints, 4);
     expect(expected).toBe(Math.round((breakdown.earnedPoints / breakdown.possiblePoints) * 100));
   });
@@ -245,6 +254,20 @@ describe("deterministic scoring", () => {
     expect(result.matchState).toBe("PARTIAL_MATCH");
     expect(result.gapReason).toBe("CERTIFICATION_NOT_HELD");
   });
+
+  it("builds the WHY screen and resume strategy only from matched authoritative evidence", () => {
+    const results = matchRequirements([
+      requirement({ importance: "REQUIRED", category: "ACCOUNTING", originalText: "ASC 606 revenue recognition expertise" }),
+      requirement({ sequenceNumber: 2, importance: "REQUIRED", category: "TECHNOLOGY", originalText: "Kubernetes administration experience" })
+    ], [
+      evidence({ id: ids.project, type: "PROJECT", label: "ASC606 Revenue Engine", text: "ASC 606 revenue recognition automation across 4,000,000 billing records" })
+    ]);
+    const insights = buildCareerMatchInsights(results);
+    expect(insights.whyYouMatch.join(" ")).toContain("ASC606 Revenue Engine");
+    expect(insights.whereYouDont.join(" ")).toContain("Kubernetes");
+    expect(insights.resumeUnderselling.join(" ")).toContain("4,000,000");
+    expect(insights.recommendedResumeStrategy.join(" ")).toMatch(/authoritative|Master Career Profile|Lead with/i);
+  });
 });
 
 describe("end-to-end analysis with a bounded provider", () => {
@@ -282,7 +305,7 @@ describe("end-to-end analysis with a bounded provider", () => {
       career
     );
     expect(result.scoreBreakdown.overallScore).toBe(result.overallScore);
-    expect(result.scoreBreakdown.model).toBe("weighted-requirement-v1");
+    expect(result.scoreBreakdown.model).toBe("weighted-requirement-v2");
   });
 });
 

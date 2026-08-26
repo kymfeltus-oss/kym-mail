@@ -4,7 +4,7 @@ import type { JobAnalysisProvider } from "@/domain/providers/job-analysis-provid
 
 /** Bounded interpreter: extracts JD structure and ranks candidate evidence. It never assigns match state or score. */
 export class DeterministicJobAnalysisProvider implements JobAnalysisProvider {
-  readonly id = "deterministic-job-analysis-v1";
+  readonly id = "deterministic-job-analysis-v2";
 
   async extractRequirements(job: JobAnalysisInput): Promise<ExtractedRequirement[]> {
     return extractJobRequirements(job.description);
