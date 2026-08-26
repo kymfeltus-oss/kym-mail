@@ -3,7 +3,7 @@ import { BadgeCheck, BookOpenCheck, Building2, Database, FileSearch, GraduationC
 import { AppShell } from "@/components/app-shell";
 import { CareerAddFact } from "@/components/career-add-fact";
 import { CareerFactEditor, type CareerEditorField } from "@/components/career-fact-editor";
-import { CareerReviewQueue, type CareerReviewCandidate } from "@/components/career-review-queue";
+import { CareerReviewQueue, type CareerReviewAuthoritativeFact, type CareerReviewCandidate } from "@/components/career-review-queue";
 import { getOwnerContext } from "@/lib/auth/owner-context";
 
 export const metadata = { title: "Master Career Profile" };
@@ -15,8 +15,10 @@ type Project = { id: string; canonical_key: string; canonical_name: string; proj
 type Accomplishment = { id: string; experience_id: string | null; project_id: string | null; category: string; statement: string };
 type Metric = { id: string; accomplishment_id: string; metric_type: string; value_numeric: number | null; value_text: string | null; before_numeric: number | null; before_text: string | null; after_numeric: number | null; after_text: string | null; unit: string | null; currency: string | null; qualifier: string | null; scope_text: string | null };
 type SourceExtraction = { id: string; source_identity: "RESUME_A" | "RESUME_B"; candidate_count: number; extraction_method: string; extracted_at: string; career_sources: { label: string; content_sha256: string | null } | null };
-type CareerFact = { id: string; fact_type: string; current_value: unknown; status: string; confirmation_method: string | null; version_number: number };
+type CareerFact = { id: string; entity_type: string; entity_id: string; field_name: string; fact_type: string; current_value: unknown; status: string; confirmation_method: string | null; version_number: number; first_added_at: string; last_changed_at: string };
 type CareerFactVersion = { id: string; career_fact_id: string; version_number: number; previous_value: unknown; new_value: unknown; change_source: string; reason: string | null; changed_at: string };
+type CareerFactSource = { id: string; career_fact_id: string; source_reference: string; confirmation_method: string; first_added_at: string; last_changed_at: string; career_sources: { label: string; intake_identity: string | null } | null };
+type CareerProvenance = { id: string; entity_type: string; entity_id: string; field_name: string; source_page: number; source_wording: string; source_role: string; resolution_note: string | null; created_at: string; updated_at: string; career_sources: { label: string; intake_identity: string | null } | null };
 
 const datePrecisionOptions = ["MONTH", "YEAR", "UNKNOWN"].map((value) => ({ label: value.charAt(0) + value.slice(1).toLowerCase(), value }));
 const completenessOptions = ["COMPLETE", "PARTIAL"].map((value) => ({ label: value.charAt(0) + value.slice(1).toLowerCase(), value }));
@@ -43,7 +45,7 @@ export default async function CareerProfilePage() {
   if (!owner?.user.email) redirect("/sign-in");
   const database = owner.database;
   const ownerId = owner.user.id;
-  const [profileResult, organizationsResult, titlesResult, experiencesResult, educationResult, credentialsResult, skillsResult, projectsResult, accomplishmentsResult, metricsResult, aliasesResult, sourcesResult, provenanceResult, historyResult, extractionsResult, candidatesResult, factsResult, factVersionsResult] = await Promise.all([
+  const [profileResult, organizationsResult, titlesResult, experiencesResult, educationResult, credentialsResult, skillsResult, projectsResult, accomplishmentsResult, metricsResult, aliasesResult, sourcesResult, provenanceResult, historyResult, extractionsResult, candidatesResult, factsResult, factVersionsResult, factSourcesResult] = await Promise.all([
     database.from("career_profiles").select("full_name, professional_headline, location_text, professional_summary, years_experience_claim, authority_status, updated_at").eq("owner_id", ownerId).maybeSingle(),
     database.from("career_organizations").select("id, canonical_name").eq("owner_id", ownerId),
     database.from("career_titles").select("id, canonical_name").eq("owner_id", ownerId),
@@ -56,14 +58,15 @@ export default async function CareerProfilePage() {
     database.from("career_metrics").select("id, accomplishment_id, metric_type, value_numeric, value_text, before_numeric, before_text, after_numeric, after_text, unit, currency, qualifier, scope_text").eq("owner_id", ownerId),
     database.from("career_aliases").select("entity_type, entity_id, alias_text").eq("owner_id", ownerId),
     database.from("career_sources").select("id, label, authority_status").eq("owner_id", ownerId).order("reviewed_at"),
-    database.from("career_provenance").select("id", { count: "exact", head: true }).eq("owner_id", ownerId),
+    database.from("career_provenance").select("id, entity_type, entity_id, field_name, source_page, source_wording, source_role, resolution_note, created_at, updated_at, career_sources(label, intake_identity)").eq("owner_id", ownerId).order("updated_at", { ascending: false }),
     database.from("career_fact_history").select("id, entity_type, changed_fields, change_source, changed_at").eq("owner_id", ownerId).order("changed_at", { ascending: false }).limit(5),
     database.from("career_source_extractions").select("id, source_identity, candidate_count, extraction_method, extracted_at, career_sources(label, content_sha256)").eq("owner_id", ownerId).eq("extraction_status", "SUCCEEDED").order("source_identity"),
-    database.from("career_candidate_facts").select("id, group_key, normalized_claim, extracted_value, source_reference, classification, status, review_reason, career_sources(label, intake_identity)").eq("owner_id", ownerId).neq("status", "REJECTED").order("created_at"),
-    database.from("career_facts").select("id, fact_type, current_value, status, confirmation_method, version_number").eq("owner_id", ownerId).order("last_changed_at", { ascending: false }),
+    database.from("career_candidate_facts").select("id, group_key, entity_type, field_name, career_fact_id, normalized_claim, extracted_value, source_reference, classification, status, review_reason, career_sources(label, intake_identity)").eq("owner_id", ownerId).neq("status", "REJECTED").order("created_at"),
+    database.from("career_facts").select("id, entity_type, entity_id, field_name, fact_type, current_value, status, confirmation_method, version_number, first_added_at, last_changed_at").eq("owner_id", ownerId).order("last_changed_at", { ascending: false }),
     database.from("career_fact_versions").select("id, career_fact_id, version_number, previous_value, new_value, change_source, reason, changed_at").eq("owner_id", ownerId).order("changed_at", { ascending: false }).limit(12),
+    database.from("career_fact_sources").select("id, career_fact_id, source_reference, confirmation_method, first_added_at, last_changed_at, career_sources(label, intake_identity)").eq("owner_id", ownerId).order("last_changed_at", { ascending: false }),
   ]);
-  const failed = [profileResult, organizationsResult, titlesResult, experiencesResult, educationResult, credentialsResult, skillsResult, projectsResult, accomplishmentsResult, metricsResult, aliasesResult, sourcesResult, provenanceResult, historyResult, extractionsResult, candidatesResult, factsResult, factVersionsResult].some((result) => result.error);
+  const failed = [profileResult, organizationsResult, titlesResult, experiencesResult, educationResult, credentialsResult, skillsResult, projectsResult, accomplishmentsResult, metricsResult, aliasesResult, sourcesResult, provenanceResult, historyResult, extractionsResult, candidatesResult, factsResult, factVersionsResult, factSourcesResult].some((result) => result.error);
   if (failed) throw new Error("CAREER_PROFILE_UNAVAILABLE");
   if (!profileResult.data) throw new Error("CAREER_PROFILE_NOT_IMPORTED");
 
@@ -87,6 +90,10 @@ export default async function CareerProfilePage() {
   const reviewGroupKeys = new Set(allCandidates.filter((candidate) => candidate.status === "NEEDS_REVIEW" || candidate.status === "CONFLICT").map((candidate) => candidate.group_key));
   const reviewCandidates = allCandidates.filter((candidate) => reviewGroupKeys.has(candidate.group_key));
   const facts = (factsResult.data ?? []) as CareerFact[];
+  const factsById = new Map(facts.map((fact) => [fact.id, fact]));
+  const factSources = (factSourcesResult.data ?? []) as unknown as CareerFactSource[];
+  const factSourcesByFact = Map.groupBy(factSources, (source) => source.career_fact_id);
+  const provenance = (provenanceResult.data ?? []) as unknown as CareerProvenance[];
   const autoConfirmedFacts = facts.filter((fact) => fact.confirmation_method === "AUTO_CONFIRMED_SOURCE_AGREEMENT");
   const ownerAddedFacts = facts.filter((fact) => fact.fact_type.startsWith("OWNER_") || (fact.current_value && typeof fact.current_value === "object" && "ownerConfirmedClaim" in fact.current_value));
   const factVersions = (factVersionsResult.data ?? []) as CareerFactVersion[];
@@ -100,6 +107,17 @@ export default async function CareerProfilePage() {
     }
     return JSON.stringify(value);
   };
+  const authoritativeFacts = Array.from(new Map(reviewCandidates.flatMap((candidate) => {
+    const fact = candidate.career_fact_id ? factsById.get(candidate.career_fact_id) : undefined;
+    if (!fact) return [];
+    const value: CareerReviewAuthoritativeFact = {
+      groupKey: candidate.group_key,
+      value: fact.current_value,
+      confirmationMethod: fact.confirmation_method,
+      sources: (factSourcesByFact.get(fact.id) ?? []).map((source) => ({ label: source.career_sources?.label ?? "Reviewed source", identity: source.career_sources?.intake_identity ?? null, reference: source.source_reference }))
+    };
+    return [[candidate.group_key, value] as const];
+  })).values());
 
   return <AppShell email={owner.user.email} canSignOut={owner.mode === "authenticated"} active="career">
     <div className="mx-auto max-w-6xl">
@@ -112,7 +130,7 @@ export default async function CareerProfilePage() {
         </div>
         <p className="mt-7 max-w-4xl text-sm leading-7 text-[#52657A]">{profile.professional_summary}</p>
         <div className="mt-7 grid gap-3 sm:grid-cols-4">
-          {[{ label: "Experience", value: profile.years_experience_claim ?? "Verified", icon: Building2 }, { label: "Career records", value: experiences.length, icon: Layers3 }, { label: "Canonical projects", value: projects.length, icon: Sparkles }, { label: "Provenance facts", value: provenanceResult.count ?? 0, icon: Database }].map((stat) => <div key={stat.label} className="rounded-2xl bg-[#FFF3F4] p-4"><stat.icon className="size-4 text-[#D95B72]" /><p className="mt-3 text-2xl font-semibold text-[#183A5A]">{stat.value}</p><p className="mt-1 text-xs font-semibold uppercase tracking-[.08em] text-[#64748B]">{stat.label}</p></div>)}
+          {[{ label: "Experience", value: profile.years_experience_claim ?? "Verified", icon: Building2 }, { label: "Career records", value: experiences.length, icon: Layers3 }, { label: "Canonical projects", value: projects.length, icon: Sparkles }, { label: "Provenance facts", value: provenance.length, icon: Database }].map((stat) => <div key={stat.label} className="rounded-2xl bg-[#FFF3F4] p-4"><stat.icon className="size-4 text-[#D95B72]" /><p className="mt-3 text-2xl font-semibold text-[#183A5A]">{stat.value}</p><p className="mt-1 text-xs font-semibold uppercase tracking-[.08em] text-[#64748B]">{stat.label}</p></div>)}
         </div>
         <nav aria-label="Career Profile sections" className="mt-6 flex gap-2 overflow-x-auto pb-1 text-xs font-semibold text-[#52657A]">{["Overview", "Experience", "Accomplishments", "Metrics", "Skills", "Technologies", "Education", "Credentials", "Applications / Projects", "Review Needed"].map((section) => <a key={section} href={`#${section.toLowerCase().replaceAll(" / ", "-").replaceAll(" ", "-")}`} className="shrink-0 rounded-full border border-[#E8E2E3] bg-white px-3 py-2 hover:border-[#D95B72] hover:text-[#A73D52]">{section}</a>)}</nav>
       </header>
@@ -123,7 +141,7 @@ export default async function CareerProfilePage() {
         {ownerAddedFacts.length > 0 && <div className="mt-5"><p className="text-xs font-semibold uppercase tracking-[.1em] text-[#A73D52]">Owner-added authoritative facts</p><ul className="mt-3 grid gap-2 sm:grid-cols-2">{ownerAddedFacts.map((fact) => <li key={fact.id} className="rounded-2xl border border-[#E8E2E3] px-4 py-3 text-sm text-[#52657A]">{displayFactValue(fact.current_value)}</li>)}</ul></div>}
       </section>
 
-      <section id="review-needed" className="mt-8"><div className="mb-4 flex items-center gap-3"><BadgeCheck className="size-5 text-[#D95B72]" /><div><h2 className="text-2xl font-semibold tracking-[-.03em] text-[#183A5A]">Review Needed</h2><p className="mt-1 text-sm text-[#64748B]">Only conflicts, ambiguous facts, and unique source claims appear here.</p></div></div><CareerReviewQueue candidates={reviewCandidates} /></section>
+      <section id="review-needed" className="mt-8"><div className="mb-4 flex items-center gap-3"><BadgeCheck className="size-5 text-[#D95B72]" /><div><h2 className="text-2xl font-semibold tracking-[-.03em] text-[#183A5A]">Review Needed</h2><p className="mt-1 text-sm text-[#64748B]">Only conflicts, ambiguous facts, and unique source claims appear here.</p></div></div><CareerReviewQueue candidates={reviewCandidates} authoritativeFacts={authoritativeFacts} /></section>
 
       <section id="experience" className="mt-8"><div className="flex items-center gap-3"><Building2 className="size-5 text-[#D95B72]" /><h2 className="text-2xl font-semibold tracking-[-.03em] text-[#183A5A]">Experience</h2></div><div className="mt-4 space-y-4">{experiences.map((experience) => <article key={experience.id} className="rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-6 shadow-[0_12px_36px_rgba(24,58,90,.05)]"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="text-lg font-semibold text-[#183A5A]">{experience.title_id ? titleNames.get(experience.title_id) : "Earlier finance/accounting leadership"}</h3><p className="mt-1 text-sm font-semibold text-[#A73D52]">{organizationNames.get(experience.organization_id)}{experience.client_organization_id ? ` · Client: ${organizationNames.get(experience.client_organization_id)}` : ""}</p></div><div className="flex items-center gap-3"><p className="text-sm font-semibold text-[#64748B]">{formatCareerDate(experience.start_date, experience.start_precision)} — {formatCareerDate(experience.end_date, experience.end_precision, experience.is_current)}</p><CareerFactEditor compact entityType="experience" recordId={experience.id} title={titleNames.get(experience.title_id ?? "") ?? "Earlier career record"} fields={[
               { key: "organization_id", label: "Employer", kind: "select", options: organizationOptions }, { key: "client_organization_id", label: "Client", kind: "select", options: organizationOptions }, { key: "title_id", label: "Title", kind: "select", options: titleOptions }, { key: "start_date", label: "Start date", kind: "date" }, { key: "start_precision", label: "Start precision", kind: "select", options: datePrecisionOptions }, { key: "end_date", label: "End date", kind: "date" }, { key: "end_precision", label: "End precision", kind: "select", options: datePrecisionOptions }, { key: "is_current", label: "This is a current role", kind: "checkbox" }, { key: "location_text", label: "Location" }, { key: "completeness", label: "Record completeness", kind: "select", options: completenessOptions }, { key: "summary", label: "Role summary", kind: "textarea" }
@@ -140,7 +158,9 @@ export default async function CareerProfilePage() {
         </div>
       </div>
 
-      <footer className="mt-8 rounded-3xl border border-[#E8E2E3] bg-[#183A5A] p-6 text-white"><div className="flex items-start gap-3"><BadgeCheck className="mt-0.5 size-5 shrink-0 text-[#F3A0A0]" /><div className="min-w-0"><h2 className="font-semibold">Provenance & immutable fact versions</h2><p className="mt-2 text-sm leading-6 text-white/65">This owner-editable profile is backed by {sourcesResult.data?.length ?? 0} reviewed sources and {provenanceResult.count ?? 0} field-level provenance records. KF Resume controls employment dates and exact titles; owner-confirmed resolutions control education, client context, project canonicalization, and current credential status. New extraction can suggest a change but cannot silently overwrite an owner-confirmed fact.</p>{factVersions.length > 0 && <ul className="mt-4 grid gap-2 sm:grid-cols-2">{factVersions.map((entry) => <li key={entry.id} className="min-w-0 rounded-2xl bg-white/8 px-4 py-3 text-xs text-white/70"><span className="font-semibold text-white">Version {entry.version_number}</span> · {entry.change_source.replaceAll("_", " ").toLowerCase()}<br /><span className="break-words">{entry.previous_value === null ? "Initial fact" : `${displayFactValue(entry.previous_value)} → ${displayFactValue(entry.new_value)}`}</span><br />{new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(entry.changed_at))}</li>)}</ul>}{(historyResult.data?.length ?? 0) > 0 && <p className="mt-4 text-xs text-white/50">Normalized record history also retains {historyResult.data?.length} recent owner/import changes.</p>}</div></div></footer>
+      <footer className="mt-8 rounded-3xl border border-[#E8E2E3] bg-[#183A5A] p-6 text-white"><div className="flex items-start gap-3"><BadgeCheck className="mt-0.5 size-5 shrink-0 text-[#F3A0A0]" /><div className="min-w-0 grow"><h2 className="font-semibold">Provenance & immutable fact versions</h2><p className="mt-2 text-sm leading-6 text-white/65">This owner-editable profile is backed by {sourcesResult.data?.length ?? 0} reviewed sources and {provenance.length} field-level provenance records. KF Resume controls employment dates and exact titles; owner-confirmed resolutions control education, client context, project canonicalization, and current credential status. New extraction can suggest a change but cannot silently overwrite an owner-confirmed fact.</p>
+        <div className="mt-5 grid gap-3 lg:grid-cols-2"><details id="provenance" className="rounded-2xl bg-white/8 p-4"><summary className="cursor-pointer text-sm font-semibold text-white">Open provenance · {provenance.length + factSources.length} records</summary><div className="mt-4 max-h-[32rem] space-y-3 overflow-y-auto pr-1">{factSources.map((source) => { const fact = factsById.get(source.career_fact_id); return <article key={source.id} className="rounded-xl bg-white/8 p-3 text-xs leading-5 text-white/70"><p className="font-semibold text-white">{fact ? displayFactValue(fact.current_value) : "Authoritative fact"}</p><p>{source.career_sources?.label ?? "Reviewed source"} · {source.confirmation_method.replaceAll("_", " ").toLowerCase()}</p><p>{source.source_reference}</p><p>First added {new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(source.first_added_at))} · Updated {new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(source.last_changed_at))}</p></article>; })}{provenance.map((entry) => <article key={entry.id} className="rounded-xl bg-white/8 p-3 text-xs leading-5 text-white/70"><p className="font-semibold text-white">{entry.entity_type.replaceAll("_", " ")} · {entry.field_name.replaceAll("_", " ")}</p><p>{entry.career_sources?.label ?? "Reviewed source"}{entry.source_page > 0 ? ` · page ${entry.source_page}` : ""} · {entry.source_role.toLowerCase()}</p><p className="break-words">{entry.source_wording}</p>{entry.resolution_note && <p className="text-[#F6C4CC]">{entry.resolution_note}</p>}<p>First added {new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(entry.created_at))} · Updated {new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(entry.updated_at))}</p></article>)}</div></details>
+          <details id="version-history" className="rounded-2xl bg-white/8 p-4"><summary className="cursor-pointer text-sm font-semibold text-white">Open version history · latest {factVersions.length}</summary>{factVersions.length > 0 && <ul className="mt-4 max-h-[32rem] space-y-2 overflow-y-auto pr-1">{factVersions.map((entry) => <li key={entry.id} className="min-w-0 rounded-xl bg-white/8 px-4 py-3 text-xs text-white/70"><span className="font-semibold text-white">Version {entry.version_number}</span> · {entry.change_source.replaceAll("_", " ").toLowerCase()}<br /><span className="break-words">{entry.previous_value === null ? "Initial fact" : `${displayFactValue(entry.previous_value)} → ${displayFactValue(entry.new_value)}`}</span>{entry.reason && <><br />{entry.reason}</>}<br />{new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(entry.changed_at))}</li>)}</ul>}</details></div>{(historyResult.data?.length ?? 0) > 0 && <p className="mt-4 text-xs text-white/50">Normalized record history also retains {historyResult.data?.length} recent owner/import changes.</p>}</div></div></footer>
     </div>
   </AppShell>;
 }
