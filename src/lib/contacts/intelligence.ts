@@ -71,6 +71,18 @@ export function classifyPostingType(job: PostingContext): { type: PostingType; r
   return { type: "UNKNOWN", reasons: ["The stored evidence does not establish whether the named organization posted the role directly."], evidence };
 }
 
+export function detectPrivateEquityContext(job: PostingContext): null | { sponsorName: string; evidence: Array<{ label: string; value: string }> } {
+  const metadataValue = job.providerMetadata?.private_equity_sponsor ?? job.providerMetadata?.pe_sponsor;
+  if (typeof metadataValue === "string" && metadataValue.trim().length >= 2 && metadataValue.trim().length <= 120) {
+    return { sponsorName: metadataValue.trim(), evidence: [{ label: "Provider metadata", value: `Private-equity sponsor: ${metadataValue.trim()}` }] };
+  }
+  const description = job.description ?? "";
+  const match = description.match(/(?:backed|owned) by\s+([A-Z][A-Za-z0-9&'. -]{1,118}?)(?=[,.;\n]|$)/);
+  if (!match?.[1]) return null;
+  const sponsorName = match[1].trim();
+  return sponsorName.length >= 2 ? { sponsorName, evidence: [{ label: "Job description", value: match[0].trim() }] } : null;
+}
+
 function addRole(roles: TargetRole[], role: TargetRole) { if (!roles.some((item) => item.title === role.title)) roles.push(role); }
 
 export function buildTargetRoleStrategy(jobTitle: string, postingType: PostingType = "DIRECT_EMPLOYER", description = ""): TargetRole[] {
@@ -113,6 +125,15 @@ export function buildTargetRoleStrategy(jobTitle: string, postingType: PostingTy
   addRole(roles, { title: "Talent Acquisition Leader", classification: "TALENT_ACQUISITION", priority: 58, reason: "Talent Acquisition is a secondary contact path." });
   if (postingType === "UNKNOWN") for (const role of roles) role.reason += " Posting ownership remains unverified.";
   return roles.sort((a, b) => b.priority - a.priority);
+}
+
+export function buildPrivateEquityRoleStrategy(jobTitle: string): TargetRole[] {
+  if (!has(jobTitle, /\bcfo\b|chief financial officer|controller|vp finance|head of finance/)) return [];
+  return [
+    { title: "Operating Partner", classification: "EXECUTIVE_SPONSOR", priority: 96, reason: "A named sponsor's operating partner may support portfolio-company finance leadership." },
+    { title: "Talent Partner", classification: "TALENT_ACQUISITION", priority: 92, reason: "A named sponsor's talent partner may coordinate portfolio leadership recruiting." },
+    { title: "Portfolio Talent Leader", classification: "TALENT_ACQUISITION", priority: 86, reason: "Portfolio talent leadership may support a source-backed executive search." }
+  ];
 }
 
 function tokens(value: string) { return new Set(value.toLowerCase().replace(/[^a-z0-9]+/g, " ").split(" ").filter((item) => item.length > 1)); }

@@ -6,7 +6,9 @@ import {
   classifyContactTitle,
   classifyPostingType,
   deduplicateRankedContacts,
+  detectPrivateEquityContext,
   discoverRelevantPeople,
+  buildPrivateEquityRoleStrategy,
   rankContact,
   verificationStateFor
 } from "@/lib/contacts/intelligence";
@@ -32,6 +34,17 @@ describe("Gate 8 hiring intelligence", () => {
     expect(roles[0].title).toBe("Job Poster");
     expect(roles.some((role) => role.title === "Recruiter")).toBe(true);
     expect(roles.some((role) => role.title === "Chief Executive Officer")).toBe(false);
+  });
+
+  it("captures a named private-equity sponsor only from source evidence", () => {
+    const context = detectPrivateEquityContext({ title: "CFO", companyName: "Portfolio Co", description: "The company is backed by North Star Capital.", sourceName: "Employer", sourceUrl: null, applicationUrl: null });
+    expect(context?.sponsorName).toBe("North Star Capital");
+    expect(buildPrivateEquityRoleStrategy("CFO").map((role) => role.title)).toContain("Operating Partner");
+  });
+
+  it("does not infer private-equity ownership without named evidence", () => {
+    expect(detectPrivateEquityContext({ title: "CFO", companyName: "Portfolio Co", description: "High-growth company", sourceName: "Adzuna", sourceUrl: null, applicationUrl: null })).toBeNull();
+    expect(buildPrivateEquityRoleStrategy("Senior Accountant")).toEqual([]);
   });
 
   it("targets CEO and President for a CFO role without calling either the hiring manager", () => {

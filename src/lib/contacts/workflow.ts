@@ -4,9 +4,12 @@ import { ConfigurationError, ConflictError, NotFoundError, ProviderUnavailableEr
 import {
   CONTACT_SEARCH_COOLDOWN_MINUTES,
   PERSON_DATA_FRESH_DAYS,
+  buildPrivateEquityRoleStrategy,
   buildTargetRoleStrategy,
   classifyContactTitle,
   classifyPostingType,
+  deduplicateRankedContacts,
+  detectPrivateEquityContext,
   discoverRelevantPeople,
   makeManualContactDedupeKey,
   normalizeOrganizationName,
@@ -58,8 +61,9 @@ function isoAfterMinutes(minutes: number) { return new Date(Date.now() + minutes
 
 async function startSearch(database: SupabaseClient, ownerId: string, job: SavedJob, organization: OrganizationRow, providers: ContactProviderBundle, projectId: string | null) {
   const posting = classifyPostingType({ title: job.title, companyName: job.company_name, description: job.description_text, sourceName: job.source_name, sourceUrl: job.source_url, applicationUrl: job.application_url, providerMetadata: job.provider_metadata });
+  const privateEquity = detectPrivateEquityContext({ title: job.title, companyName: job.company_name, description: job.description_text, sourceName: job.source_name, sourceUrl: job.source_url, applicationUrl: job.application_url, providerMetadata: job.provider_metadata });
   const targetRoles = buildTargetRoleStrategy(job.title, posting.type, job.description_text ?? "");
-  const contextFingerprint = fingerprint(JSON.stringify({ job: job.id, company: job.company_name, title: job.title, description: job.description_text, posting, targetRoles }));
+  const contextFingerprint = fingerprint(JSON.stringify({ job: job.id, company: job.company_name, title: job.title, description: job.description_text, posting, privateEquity, targetRoles }));
   const { data: prior, error: priorError } = await database.from("job_contact_searches").select("search_version, next_search_allowed_at, context_fingerprint").eq("owner_id", ownerId).eq("job_opportunity_id", job.id).maybeSingle();
   if (priorError) throw new ProviderUnavailableError("People research could not be started.");
   if (prior?.next_search_allowed_at && new Date(prior.next_search_allowed_at).getTime() > Date.now() && prior.context_fingerprint === contextFingerprint) throw new ConflictError("Research is cached to prevent duplicate provider charges. Use the existing shortlist until the cooldown ends.");
@@ -75,6 +79,8 @@ async function startSearch(database: SupabaseClient, ownerId: string, job: Saved
     posting_type: posting.type,
     posting_type_reasons: posting.reasons,
     posting_type_evidence: posting.evidence,
+    pe_sponsor_name: privateEquity?.sponsorName ?? null,
+    pe_context_evidence: privateEquity?.evidence ?? [],
     context_fingerprint: contextFingerprint,
     people_provider_key: providers.people?.key ?? null,
     email_provider_key: null,
@@ -88,7 +94,7 @@ async function startSearch(database: SupabaseClient, ownerId: string, job: Saved
     refresh_after: null
   }, { onConflict: "owner_id,job_opportunity_id" });
   if (error) throw new ProviderUnavailableError("People research could not be started.");
-  return { targetRoles, posting, searchVersion };
+  return { targetRoles, posting, privateEquity, searchVersion };
 }
 
 async function failSearch(database: SupabaseClient, ownerId: string, jobId: string, code: string, message: string) {
@@ -105,7 +111,7 @@ export async function runContactSearch(database: SupabaseClient, ownerId: string
   const job = await loadSavedJob(database, ownerId, jobId);
   const projectId = await resolveProjectId(database, ownerId, job.id, requestedProjectId);
   const organization = await ensureJobOrganization(database, ownerId, job);
-  const { targetRoles, posting, searchVersion } = await startSearch(database, ownerId, job, organization, providers, projectId);
+  const { targetRoles, posting, privateEquity, searchVersion } = await startSearch(database, ownerId, job, organization, providers, projectId);
   if (!providers.people) {
     const message = "People research is not configured. Set server-only APOLLO_API_KEY with organization enrichment, People API Search, and People Enrichment access. Existing and manually entered people remain available.";
     await failSearch(database, ownerId, job.id, "PEOPLE_PROVIDER_NOT_CONFIGURED", message);
@@ -113,13 +119,21 @@ export async function runContactSearch(database: SupabaseClient, ownerId: string
   }
   try {
     const result = await discoverRelevantPeople({ organization: { canonicalName: organization.canonical_name, domain: organization.domain, alternateNames: organization.alternate_names ?? [] }, targetRoles, postingType: posting.type, people: providers.people });
+    let contacts = result.contacts;
+    let usage = { ...result.usage };
+    const sponsorRoles = privateEquity ? buildPrivateEquityRoleStrategy(job.title) : [];
+    if (privateEquity && sponsorRoles.length) {
+      const sponsor = await discoverRelevantPeople({ organization: { canonicalName: privateEquity.sponsorName, domain: null, alternateNames: [] }, targetRoles: sponsorRoles, postingType: "DIRECT_EMPLOYER", people: providers.people });
+      contacts = deduplicateRankedContacts([...contacts, ...sponsor.contacts.map((contact) => ({ ...contact, relevanceReasons: [...contact.relevanceReasons, `The job description or structured provider evidence names ${privateEquity.sponsorName} as the private-equity sponsor.`] }))]);
+      usage = { requests: result.usage.requests + sponsor.usage.requests, credits: result.usage.credits === null || sponsor.usage.credits === null ? null : result.usage.credits + sponsor.usage.credits };
+    }
     if (result.resolvedOrganization) {
       const { error } = await database.from("job_contact_organizations").update({ canonical_name: result.resolvedOrganization.canonicalName, domain: result.resolvedOrganization.domain, alternate_names: result.resolvedOrganization.alternateNames, source_type: "PEOPLE_PROVIDER", source_provider: result.resolvedOrganization.providerKey, source_record_id: result.resolvedOrganization.sourceRecordId, confidence: result.resolvedOrganization.confidence, resolved_at: new Date().toISOString(), stale_at: null }).eq("owner_id", ownerId).eq("id", organization.id);
       if (error) throw new ProviderUnavailableError("The resolved organization could not be stored.");
     }
     const activeIds: string[] = [];
-    for (let index = 0; index < result.contacts.length; index++) {
-      const contact = result.contacts[index];
+    for (let index = 0; index < contacts.length; index++) {
+      const contact = contacts[index];
       const { data: stored, error } = await database.from("job_contacts").upsert({
         owner_id: ownerId, job_opportunity_id: job.id, organization_id: organization.id, project_id: projectId,
         full_name: contact.fullName, first_name: contact.firstName, last_name: contact.lastName, current_title: contact.currentTitle,
@@ -143,9 +157,9 @@ export async function runContactSearch(database: SupabaseClient, ownerId: string
       }
     }
     const refreshAfter = new Date(Date.now() + PERSON_DATA_FRESH_DAYS * 86_400_000).toISOString();
-    const { error } = await database.from("job_contact_searches").update({ status: "COMPLETE", provider_usage: result.usage, failure_code: null, failure_message: null, completed_at: new Date().toISOString(), refresh_after: refreshAfter }).eq("owner_id", ownerId).eq("job_opportunity_id", job.id);
+    const { error } = await database.from("job_contact_searches").update({ status: "COMPLETE", provider_usage: usage, failure_code: null, failure_message: null, completed_at: new Date().toISOString(), refresh_after: refreshAfter }).eq("owner_id", ownerId).eq("job_opportunity_id", job.id);
     if (error) throw new ProviderUnavailableError("Research status could not be stored.");
-    return { status: "COMPLETE" as const, discovered: activeIds.length, postingType: posting.type, providerCalls: result.usage.requests, credits: result.usage.credits };
+    return { status: "COMPLETE" as const, discovered: activeIds.length, postingType: posting.type, providerCalls: usage.requests, credits: usage.credits };
   } catch (error) {
     await failSearch(database, ownerId, job.id, "PEOPLE_PROVIDER_UNAVAILABLE", "The people provider is temporarily unavailable. Existing research was preserved.");
     if (error instanceof ProviderUnavailableError || error instanceof ConfigurationError) throw error;

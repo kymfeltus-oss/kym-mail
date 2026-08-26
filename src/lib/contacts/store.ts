@@ -7,7 +7,7 @@ type ProviderConfiguration = { people: string | null; requirement: string | null
 export async function loadContactIntelligenceView(database: SupabaseClient, ownerId: string, jobId: string, providerConfiguration: ProviderConfiguration): Promise<ContactView> {
   const [{ data: organization, error: organizationError }, { data: search, error: searchError }, { data: contacts, error: contactsError }, { data: resume, error: resumeError }] = await Promise.all([
     database.from("job_contact_organizations").select("id, canonical_name, domain, source_provider, confidence, resolved_at, stale_at").eq("owner_id", ownerId).eq("job_opportunity_id", jobId).maybeSingle(),
-    database.from("job_contact_searches").select("status, target_roles, search_version, failure_code, failure_message, completed_at, refresh_after, posting_type, posting_type_reasons, posting_type_evidence, project_id, provider_usage").eq("owner_id", ownerId).eq("job_opportunity_id", jobId).maybeSingle(),
+    database.from("job_contact_searches").select("status, target_roles, search_version, failure_code, failure_message, completed_at, refresh_after, posting_type, posting_type_reasons, posting_type_evidence, pe_sponsor_name, pe_context_evidence, project_id, provider_usage").eq("owner_id", ownerId).eq("job_opportunity_id", jobId).maybeSingle(),
     database.from("job_contacts").select("id, full_name, current_title, department, seniority, company_name, company_domain, location_text, professional_profile_url, classifications, relevance_score, relevance_level, relevance_reasons, approval_state, verification_state, recommendation_label, approved_at, rejected_at, project_id, research_version, status, source_provider, discovered_at, last_confirmed_at").eq("owner_id", ownerId).eq("job_opportunity_id", jobId).neq("status", "ARCHIVED").order("approval_state").order("relevance_score", { ascending: false }).order("full_name"),
     database.from("tailored_resumes").select("current_version_id, tailored_resume_versions!tailored_resumes_current_version_fkey(id, version_number, status, project_id)").eq("owner_id", ownerId).eq("job_opportunity_id", jobId).maybeSingle()
   ]);
@@ -36,7 +36,8 @@ export async function loadContactIntelligenceView(database: SupabaseClient, owne
       postingTypeReasons: search.posting_type_reasons ?? [],
       postingTypeEvidence: search.posting_type_evidence ?? [],
       projectId: search.project_id,
-      providerUsage: { requests: Number(search.provider_usage?.requests ?? 0), credits: typeof search.provider_usage?.credits === "number" ? search.provider_usage.credits : null }
+      providerUsage: { requests: Number(search.provider_usage?.requests ?? 0), credits: typeof search.provider_usage?.credits === "number" ? search.provider_usage.credits : null },
+      privateEquityContext: search.pe_sponsor_name ? { sponsorName: search.pe_sponsor_name, evidence: search.pe_context_evidence ?? [] } : null
     } : null,
     resumeContext,
     contacts: (contacts ?? []).map((contact) => {

@@ -107,6 +107,7 @@ export type ContactIntelligenceView = {
     postingTypeEvidence: Array<{ label: string; value: string }>;
     projectId: string | null;
     providerUsage: { requests: number; credits: number | null };
+    privateEquityContext: null | { sponsorName: string; evidence: Array<{ label: string; value: string }> };
   };
   resumeContext: null | { versionId: string; versionNumber: number; status: "APPROVED" | "STALE"; projectId: string | null };
   contacts: Array<{
