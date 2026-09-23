@@ -77,4 +77,35 @@ describe("GoogleMailProvider authorization recovery", () => {
     await provider.send({ from: "kym@kymmailapp.com", to: ["recipient@example.com"], subject: "Scheduled", textBody: "Approved body", messageId: "<kym-schedule-test@kymmailapp.com>" });
     expect(Buffer.from(raw, "base64url").toString("utf8")).toContain("Message-ID: <kym-schedule-test@kymmailapp.com>");
   });
+
+  it("sends replies in the original Gmail thread with reply headers", async () => {
+    configureGoogleEnvironment();
+    let requestBody: { raw: string; threadId?: string } | null = null;
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
+      requestBody = JSON.parse(String(init?.body)) as { raw: string; threadId?: string };
+      return new Response(JSON.stringify({ id: "reply-message", threadId: "provider-thread" }), { status: 200 });
+    }));
+    const database = { from() { return { update() { return { async eq() { return { error: null }; } }; } }; } } as unknown as SupabaseClient;
+    const provider = new GoogleMailProvider({
+      id: "connection-id",
+      encrypted_access_token: encryptToken("access-token"),
+      encrypted_refresh_token: encryptToken("refresh-token"),
+      token_expires_at: new Date(Date.now() + 120_000).toISOString()
+    }, database);
+    await provider.send({
+      from: "kym@kymmailapp.com",
+      to: ["recipient@example.com"],
+      subject: "Re: Opportunity",
+      textBody: "Thanks for the update.",
+      threadId: "provider-thread",
+      replyToMessageId: "<original@example.com>"
+    });
+    expect(requestBody).not.toBeNull();
+    expect(requestBody!.threadId).toBe("provider-thread");
+    const mime = Buffer.from(requestBody!.raw, "base64url").toString("utf8");
+    expect(mime).toContain("In-Reply-To: <original@example.com>");
+    expect(mime).toContain("References: <original@example.com>");
+    expect(mime).toContain("Content-Type: text/html; charset=UTF-8");
+    expect(mime).toContain(Buffer.from("Thanks for the update.").toString("base64"));
+  });
 });

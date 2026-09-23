@@ -28,6 +28,20 @@ export default async function ConsultPage({ searchParams }: { searchParams: Prom
         </div>
         {settings ? <div className="min-w-0"><div className="mb-5 min-w-0 rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-6 sm:p-8"><p className="text-xs font-semibold uppercase tracking-[.18em] text-[#D95B72]">Zelle payment</p><div className="mt-4 rounded-2xl bg-[#FFF3F4] p-5"><p className="break-words text-sm font-semibold text-[#A73D52]">Pay with Zelle to {settings.zelle_recipient_name}</p><p className="mt-1 break-words text-sm font-semibold text-[#183A5A]">{settings.zelle_contact}</p><p className="mt-3 whitespace-pre-line break-words text-sm leading-6 text-[#526173]">{settings.payment_instructions}</p>{settings.reference_instructions && <p className="mt-2 break-words text-sm leading-6 text-[#526173]">Reference: {settings.reference_instructions}</p>}</div><p className="mt-4 text-xs leading-5 text-[#7A8795]">KYM Mail does not connect to Zelle. Payment proof is reviewed manually by the owner.</p></div><ConsultationForm /></div> : <div className="min-w-0 rounded-3xl border border-[#E8E2E3] bg-white p-8"><h2 className="text-xl font-semibold text-[#183A5A]">Paid consultation intake is not open yet.</h2><p className="mt-3 text-sm leading-6 text-[#64748B]">The owner is finishing the payment instructions. Please check back soon.</p></div>}
       </section>
+      <section className="mb-16 rounded-[2rem] border border-[#E8E2E3] bg-white p-6 sm:p-10">
+        <div className="grid gap-8 lg:grid-cols-[.9fr_1.1fr] lg:items-center">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[.18em] text-[#D95B72]">Already a paying client?</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-[-.04em] text-[#183A5A]">Book a 15-minute session.</h2>
+            <p className="mt-4 text-sm leading-6 text-[#5E6C7D]">These meetings are only for people who are already paying clients. There is no consultation fee. Your booking code is your client number.</p>
+            <ul className="mt-5 grid gap-2 text-sm text-[#526173]"><li>Register once with your client number.</li><li>Use the client dashboard for payments and job status updates.</li><li>Confirm your client number to open the 15-minute calendar.</li></ul>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+            <Link href="/client/register" className="inline-flex items-center justify-center rounded-full border border-[#E7B8C1] bg-[#FFF3F4] px-5 py-3 text-sm font-semibold text-[#A73D52]">Register with client number</Link>
+            <Link href="/client/sign-in" className="inline-flex items-center justify-center rounded-full bg-[#183A5A] px-5 py-3 text-sm font-semibold text-white">Open client dashboard</Link>
+          </div>
+        </div>
+      </section>
     </div>
   </main>;
 }

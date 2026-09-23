@@ -19,6 +19,32 @@ export async function POST(request: Request) {
   const fingerprint = createHash("sha256").update(rawBody).digest("hex");
   try {
     const event = parseCalWebhook(rawBody);
+    if (event.clientSessionBookingId && !event.requestId) {
+      const { data: sessionBooking } = await database.from("client_session_bookings").select("id, owner_id, client_id, status, provider_booking_id").eq("id", event.clientSessionBookingId).maybeSingle();
+      const { data: client } = sessionBooking ? await database.from("clients").select("email").eq("id", sessionBooking.client_id).maybeSingle() : { data: null };
+      if (!sessionBooking || !client || event.attendeeEmail !== client.email) return NextResponse.json({ error: "Client session booking does not match." }, { status: 404 });
+      if (event.triggerEvent === "BOOKING_CANCELLED") {
+        if (sessionBooking.provider_booking_id && sessionBooking.provider_booking_id !== event.bookingId) throw new Error("CALCOM_BOOKING_MISMATCH");
+        const { error: updateError } = await database.from("client_session_bookings").update({ status: "CANCELLED", cancelled_at: new Date().toISOString() }).eq("id", sessionBooking.id);
+        if (updateError) throw new Error("CALCOM_CLIENT_SESSION_UPDATE_FAILED");
+      } else {
+        if (!["RELEASED", "BOOKED"].includes(sessionBooking.status)) throw new Error("CALCOM_CLIENT_SESSION_NOT_RELEASED");
+        if (sessionBooking.provider_booking_id && sessionBooking.provider_booking_id !== event.bookingId) throw new Error("CALCOM_BOOKING_MISMATCH");
+        const { error: updateError } = await database.from("client_session_bookings").update({
+          status: "BOOKED",
+          provider_booking_id: event.bookingId,
+          booking_start_at: event.startTime,
+          booking_end_at: event.endTime,
+          booking_timezone: event.timezone,
+          booking_title: event.title,
+          booked_at: new Date().toISOString(),
+          cancelled_at: null
+        }).eq("id", sessionBooking.id);
+        if (updateError) throw new Error("CALCOM_CLIENT_SESSION_UPDATE_FAILED");
+      }
+      log("info", "client_session.calcom_webhook_processed", { requestId: sessionBooking.id, trigger: event.triggerEvent });
+      return NextResponse.json({ processed: true, kind: "CLIENT_SESSION" });
+    }
     if (!event.requestId) return NextResponse.json({ error: "Consultation request metadata is required." }, { status: 400 });
     const { data: consultation } = await database.from("consultation_requests").select("id, owner_id, client_email, payment_status, provider_booking_id").eq("id", event.requestId).maybeSingle();
     if (!consultation || event.attendeeEmail !== consultation.client_email) return NextResponse.json({ error: "Consultation booking does not match." }, { status: 404 });

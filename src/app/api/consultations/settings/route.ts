@@ -24,6 +24,8 @@ export async function PUT(request: NextRequest) {
     reference_instructions: input.referenceInstructions || null,
     paid_booking_url: input.firstTimeBookingUrl,
     returning_booking_url: input.returningBookingUrl,
+    client_session_booking_url: input.clientSessionBookingUrl || null,
+    client_sessions_active: input.clientSessionsActive,
     free_booking_url: null,
     scheduling_provider: "CAL_COM",
     is_active: input.isActive

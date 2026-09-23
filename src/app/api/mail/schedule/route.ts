@@ -5,6 +5,7 @@ import { toSafeError, ValidationError } from "@/lib/errors";
 import { log } from "@/lib/logger";
 import { attachmentSha256, validateAttachmentFiles } from "@/lib/mail/attachment-validation";
 import { validateComposeInput } from "@/lib/mail/compose-validation";
+import { loadForwardedAttachments, parseForwardAttachmentIds } from "@/lib/mail/forwarded-attachments";
 import { requireScheduledIdentity, resolveScheduledProject } from "@/lib/scheduling/access";
 import { scheduledAttachmentBucket, scheduledRfcMessageId } from "@/lib/scheduling/constants";
 import { validateScheduleTiming } from "@/lib/scheduling/validation";
@@ -45,19 +46,29 @@ export async function POST(request: NextRequest) {
     const requestedProjectId = typeof rawProjectId === "string" && rawProjectId ? z.string().uuid().parse(rawProjectId) : null;
     const files = form.getAll("attachments").filter((entry): entry is File => entry instanceof File && entry.size > 0);
     if (!validateAttachmentFiles(files)) throw new ValidationError("One or more attachments are unsupported or too large.");
+    const forwardAttachmentIds = parseForwardAttachmentIds(form.getAll("forwardAttachmentIds"));
+    if (!forwardAttachmentIds) throw new ValidationError("The forwarded attachment selection is invalid.");
 
     const identity = await requireScheduledIdentity(owner.database, owner.user.id, input.from);
     const projectId = await resolveScheduledProject(owner.database, owner.user.id, requestedProjectId, input.providerThreadId);
+    const uploadedAttachments = await Promise.all(files.map(async (file) => ({ filename: file.name, mimeType: file.type || "application/octet-stream", content: new Uint8Array(await file.arrayBuffer()) })));
+    const forwardedAttachments = await loadForwardedAttachments(
+      database,
+      owner.user.id,
+      identity.mail_connection_id,
+      forwardAttachmentIds,
+      uploadedAttachments.map((attachment) => ({ name: attachment.filename, size: attachment.content.byteLength }))
+    );
     scheduledId = crypto.randomUUID();
     const attachments = [] as Array<{ id: string; owner_id: string; scheduled_message_id: string; object_path: string; filename: string; mime_type: string; size_bytes: number; sha256: string }>;
-    for (const file of files) {
-      const content = new Uint8Array(await file.arrayBuffer());
+    for (const file of [...forwardedAttachments, ...uploadedAttachments]) {
+      const content = file.content;
       const attachmentId = crypto.randomUUID();
-      const objectPath = `${owner.user.id}/${scheduledId}/${attachmentId}-${safeStorageName(file.name)}`;
-      const { error: uploadError } = await database.storage.from(scheduledAttachmentBucket).upload(objectPath, content, { contentType: file.type || "application/octet-stream", upsert: false });
+      const objectPath = `${owner.user.id}/${scheduledId}/${attachmentId}-${safeStorageName(file.filename)}`;
+      const { error: uploadError } = await database.storage.from(scheduledAttachmentBucket).upload(objectPath, content, { contentType: file.mimeType, upsert: false });
       if (uploadError) throw new ValidationError("An attachment could not be stored securely for scheduled delivery.");
       uploadedPaths.push(objectPath);
-      attachments.push({ id: attachmentId, owner_id: owner.user.id, scheduled_message_id: scheduledId, object_path: objectPath, filename: file.name, mime_type: file.type || "application/octet-stream", size_bytes: file.size, sha256: attachmentSha256(content) });
+      attachments.push({ id: attachmentId, owner_id: owner.user.id, scheduled_message_id: scheduledId, object_path: objectPath, filename: file.filename, mime_type: file.mimeType, size_bytes: content.byteLength, sha256: attachmentSha256(content) });
     }
 
     const { error: messageError } = await database.from("scheduled_messages").insert({

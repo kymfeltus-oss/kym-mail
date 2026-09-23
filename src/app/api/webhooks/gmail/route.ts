@@ -65,7 +65,8 @@ export async function POST(request: NextRequest) {
 
   if (connection) {
     try {
-      await syncGmailConnection(database, connection.id);
+      const result = await syncGmailConnection(database, connection.id);
+      if (result.deferred) return new NextResponse(null, { status: 204 });
       await database.from("gmail_notifications").update({
         processed_at: new Date().toISOString(),
         processing_error: null
@@ -75,7 +76,7 @@ export async function POST(request: NextRequest) {
       await database.from("gmail_notifications").update({ processing_error: safeError.safeMessage }).eq("deduplication_key", notification.deduplicationKey);
       await database.from("mail_connections").update({ sync_error: safeError.safeMessage, updated_at: new Date().toISOString() }).eq("id", connection.id);
       log("error", "mail.gmail_notification_processing_failed", { mailConnectionId: connection.id, code: safeError.code, pubSubMessageId: notification.pubSubMessageId });
-      return NextResponse.json({ error: "Notification unavailable" }, { status: 503 });
+      return new NextResponse(null, { status: 204 });
     }
   }
 

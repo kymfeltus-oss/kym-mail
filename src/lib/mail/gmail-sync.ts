@@ -3,6 +3,7 @@ import { GoogleMailProvider } from "@/integrations/google/google-mail-provider";
 import { getGoogleMailEnv } from "@/lib/env";
 import { AppError } from "@/lib/errors";
 import { log } from "@/lib/logger";
+import { isRecoverableGmailHistoryError, providerStatus } from "@/lib/mail/google-api-error";
 import { normalizeGmailMessage, type GmailMessage, type NormalizedGmailMessage } from "@/lib/mail/gmail-message";
 
 type MailIdentity = { id: string; email_address: string; is_default: boolean };
@@ -26,17 +27,13 @@ export type GmailSyncResult = {
   deleted: number;
   skipped: number;
   historyId: string;
+  deferred?: boolean;
 };
 
 const INITIAL_SYNC_DAYS = 30;
 const INITIAL_SYNC_LIMIT = 100;
 const FETCH_CONCURRENCY = 8;
-
-function providerStatus(error: unknown) {
-  if (!(error instanceof AppError) || !error.details || typeof error.details !== "object") return null;
-  const status = (error.details as { status?: unknown }).status;
-  return typeof status === "number" ? status : null;
-}
+const SYNC_LOCK_MS = 90_000;
 
 function identityForMessage(message: NormalizedGmailMessage, identities: MailIdentity[]) {
   const candidates = message.isSent
@@ -52,7 +49,7 @@ function initialQuery(identities: MailIdentity[]) {
 
 export async function loadGoogleProvider(database: SupabaseClient, connectionId: string) {
   const [{ data: connection, error: connectionError }, { data: credentials, error: credentialError }] = await Promise.all([
-    database.from("mail_connections").select("id, owner_id, connection_state, sync_history_id, initial_sync_completed_at, watch_expires_at").eq("id", connectionId).single(),
+    database.from("mail_connections").select("id, owner_id, connection_state, sync_history_id, initial_sync_completed_at, watch_expires_at, sync_lock_at").eq("id", connectionId).single(),
     database.from("mail_connection_credentials").select("mail_connection_id, encrypted_access_token, encrypted_refresh_token, token_expires_at").eq("mail_connection_id", connectionId).single()
   ]);
   if (connectionError || credentialError || !connection || !credentials) throw new AppError("UNAUTHORIZED", "Connect Google Mail to synchronize messages.");
@@ -180,6 +177,28 @@ async function persistMessage(database: SupabaseClient, connectionId: string, ow
 
 export async function syncGmailConnection(database: SupabaseClient, connectionId: string, requestedMode: SyncMode = "incremental"): Promise<GmailSyncResult> {
   const { connection, provider } = await loadGoogleProvider(database, connectionId);
+  const lockHeldUntil = connection.sync_lock_at ? new Date(connection.sync_lock_at).getTime() + SYNC_LOCK_MS : 0;
+  if (lockHeldUntil > Date.now()) {
+    log("info", "mail.gmail_sync_deferred", { mailConnectionId: connectionId });
+    return { mode: requestedMode, upserted: 0, deleted: 0, skipped: 0, historyId: connection.sync_history_id ?? "", deferred: true };
+  }
+  const lockStartedAt = new Date().toISOString();
+  await database.from("mail_connections").update({ sync_lock_at: lockStartedAt, updated_at: lockStartedAt }).eq("id", connectionId);
+
+  try {
+    return await runGmailSync(database, connectionId, requestedMode, connection, provider);
+  } finally {
+    await database.from("mail_connections").update({ sync_lock_at: null, updated_at: new Date().toISOString() }).eq("id", connectionId).eq("sync_lock_at", lockStartedAt);
+  }
+}
+
+async function runGmailSync(
+  database: SupabaseClient,
+  connectionId: string,
+  requestedMode: SyncMode,
+  connection: { owner_id: string; connection_state: string; sync_history_id: string | null; initial_sync_completed_at: string | null; watch_expires_at: string | null },
+  provider: GoogleMailProvider
+): Promise<GmailSyncResult> {
   const { data: identities, error: identitiesError } = await database
     .from("mail_accounts")
     .select("id, email_address, is_default")
@@ -204,11 +223,20 @@ export async function syncGmailConnection(database: SupabaseClient, connectionId
   if (latestHistoryId) {
     try {
       const history = await provider.listHistory(latestHistoryId);
-      history.messageIds.forEach((id) => messageIds.add(id));
-      history.deletedMessageIds.forEach((id) => deletedMessageIds.add(id));
-      latestHistoryId = history.latestHistoryId;
+      if (history.truncated || history.messageIds.length > INITIAL_SYNC_LIMIT) {
+        reconciledHistoryGap = true;
+        if (mode !== "initial") {
+          const reconciliationIds = await provider.listMessageIds(initialQuery(identities), INITIAL_SYNC_LIMIT);
+          reconciliationIds.forEach(({ messageId }) => messageIds.add(messageId));
+        }
+        latestHistoryId = (await provider.getProfile()).historyId;
+      } else {
+        history.messageIds.forEach((id) => messageIds.add(id));
+        history.deletedMessageIds.forEach((id) => deletedMessageIds.add(id));
+        latestHistoryId = history.latestHistoryId;
+      }
     } catch (error) {
-      if (providerStatus(error) !== 404) throw error;
+      if (!isRecoverableGmailHistoryError(error)) throw error;
       reconciledHistoryGap = true;
       const reconciliationIds = await provider.listMessageIds(initialQuery(identities), INITIAL_SYNC_LIMIT);
       reconciliationIds.forEach(({ messageId }) => messageIds.add(messageId));

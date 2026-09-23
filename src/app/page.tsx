@@ -1,2 +1,7 @@
 import { redirect } from "next/navigation";
-export default function Home() { redirect("/app"); }
+import { getOwnerContext } from "@/lib/auth/owner-context";
+
+export default async function Home() {
+  const owner = await getOwnerContext();
+  redirect(owner?.user.email ? "/app" : "/consult");
+}

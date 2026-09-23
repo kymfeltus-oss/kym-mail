@@ -135,6 +135,43 @@ export function applySearchRelevance(job: NormalizedJob, terms: string[]): Norma
   };
 }
 
+export const jobSearchSorts = ["BEST_MATCHED", "NEWEST", "HIGHEST_SALARY", "COMPANY"] as const;
+export type JobSearchSort = (typeof jobSearchSorts)[number];
+export const jobSearchSortLabels: Record<JobSearchSort, string> = {
+  BEST_MATCHED: "Best matched",
+  NEWEST: "Newest",
+  HIGHEST_SALARY: "Highest salary",
+  COMPANY: "Company A–Z"
+};
+
+export function isJobSearchSort(value: string): value is JobSearchSort {
+  return (jobSearchSorts as readonly string[]).includes(value);
+}
+
+export function searchMatchScore(job: Pick<NormalizedJob, "matchedTitleTerms" | "matchedDescriptionTerms" | "strongKeywordMatch">) {
+  return (job.strongKeywordMatch ? 1000 : 0) + job.matchedTitleTerms.length * 10 + job.matchedDescriptionTerms.length * 2;
+}
+
+export function sortSearchJobs<T extends NormalizedJob>(jobs: T[], sort: JobSearchSort): T[] {
+  return [...jobs].sort((left, right) => {
+    if (sort === "BEST_MATCHED") {
+      const score = searchMatchScore(right) - searchMatchScore(left);
+      return score || left.title.localeCompare(right.title) || left.providerJobId.localeCompare(right.providerJobId);
+    }
+    if (sort === "NEWEST") {
+      const rightTime = right.postedAt ? Date.parse(right.postedAt) : 0;
+      const leftTime = left.postedAt ? Date.parse(left.postedAt) : 0;
+      return rightTime - leftTime || left.title.localeCompare(right.title) || left.providerJobId.localeCompare(right.providerJobId);
+    }
+    if (sort === "HIGHEST_SALARY") {
+      const rightPay = right.salaryMaximum ?? right.salaryMinimum ?? -1;
+      const leftPay = left.salaryMaximum ?? left.salaryMinimum ?? -1;
+      return rightPay - leftPay || left.title.localeCompare(right.title) || left.providerJobId.localeCompare(right.providerJobId);
+    }
+    return left.companyName.localeCompare(right.companyName) || left.title.localeCompare(right.title) || left.providerJobId.localeCompare(right.providerJobId);
+  });
+}
+
 export function buildProjectSearchDefaults(parameters: Record<string, unknown>) {
   const strings = (value: unknown) => Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
   const targetRoles = strings(parameters.targetRoles);

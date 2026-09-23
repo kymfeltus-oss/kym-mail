@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatMailTimestamp } from "@/lib/mail/date-format";
 
 type State = "idle" | "syncing" | "complete" | "error";
 
-export function MailSyncControl({ connected, initialSyncComplete, lastSyncedAt }: { connected: boolean; initialSyncComplete: boolean; lastSyncedAt: string | null }) {
+export function MailSyncControl({ connected, initialSyncComplete, lastSyncedAt, autoStart = true }: { connected: boolean; initialSyncComplete: boolean; lastSyncedAt: string | null; autoStart?: boolean }) {
   const router = useRouter();
   const started = useRef(false);
   const [state, setState] = useState<State>("idle");
@@ -25,11 +26,11 @@ export function MailSyncControl({ connected, initialSyncComplete, lastSyncedAt }
   }, [router]);
 
   useEffect(() => {
-    if (connected && !started.current) {
+    if (connected && autoStart && !started.current) {
       started.current = true;
       void synchronize();
     }
-  }, [connected, initialSyncComplete, synchronize]);
+  }, [autoStart, connected, initialSyncComplete, synchronize]);
 
   if (!connected) return null;
   return <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -39,6 +40,9 @@ export function MailSyncControl({ connected, initialSyncComplete, lastSyncedAt }
     <p className="text-xs text-[#64748B]">
       {state === "syncing" ? "Retrieving real Gmail messages…" : state === "complete" ? "Mailbox synchronized." : lastSyncedAt ? `Last synchronized ${formatMailTimestamp(lastSyncedAt)}` : "Mailbox has not synchronized yet."}
     </p>
-    {error && <p role="alert" className="w-full text-xs text-[#A73D52]">{error}</p>}
+    {error && <div className="flex w-full flex-wrap items-center gap-3">
+      <p role="alert" className="text-xs text-[#A73D52]">{error}</p>
+      <Link href="/api/oauth/google/start" className="rounded-full bg-[#D95B72] px-4 py-2 text-xs font-semibold text-white">Reconnect Google Mail</Link>
+    </div>}
   </div>;
 }

@@ -1,11 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { AppError } from "@/lib/errors";
 import { getGoogleMailEnv } from "@/lib/env";
+import { log } from "@/lib/logger";
+import { googleMailFailure } from "@/lib/mail/google-api-error";
+import { buildProfessionalEmailHtml } from "@/lib/mail/professional-html";
 import { decryptToken, encryptToken } from "@/lib/mail/token-crypto";
 import type { MailProvider, OutgoingMail, ProviderSendResult } from "@/domain/providers/mail-provider";
 
 type ConnectionTokens = { id: string; encrypted_access_token: string | null; encrypted_refresh_token: string | null; token_expires_at: string | null };
-type GoogleError = { error?: { code?: number; message?: string; status?: string } };
+type GoogleError = { error?: { code?: number; status?: string } };
 
 function safeHeader(value: string) { return value.replace(/[\r\n]+/g, " ").trim(); }
 function base64Lines(value: Uint8Array | string) {
@@ -41,7 +44,14 @@ export class GoogleMailProvider implements MailProvider {
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
     const response = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me${path}`, { ...init, headers: { authorization: `Bearer ${await this.accessToken()}`, "content-type": "application/json", ...init?.headers } });
     if (response.status === 401) return this.requireReauthorization();
-    if (!response.ok) { const body = await response.json().catch(() => ({})) as GoogleError; throw new AppError("PROVIDER_UNAVAILABLE", "Google Mail is temporarily unavailable.", { status: response.status, providerStatus: body.error?.status }); }
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({})) as GoogleError;
+      const requestPath = path.split("?")[0] || path;
+      const failure = googleMailFailure(response.status, body.error?.status);
+      log("error", "mail.google_api_failed", { status: failure.status, providerStatus: failure.providerStatus, path: requestPath });
+      if (failure.forbidden && (requestPath === "/profile" || requestPath === "/messages")) return this.requireReauthorization();
+      throw new AppError("PROVIDER_UNAVAILABLE", failure.safeMessage, { status: failure.status, providerStatus: failure.providerStatus, path: requestPath });
+    }
     return response.json() as Promise<T>;
   }
 
@@ -54,8 +64,8 @@ export class GoogleMailProvider implements MailProvider {
   }
   getMessage(messageId: string) { return this.request(`/messages/${encodeURIComponent(messageId)}?format=full`); }
   getAttachment(messageId: string, attachmentId: string) { return this.request<{ data: string; size: number }>(`/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}`); }
-  async listHistory(startHistoryId: string) {
-    let pageToken: string | undefined; const ids = new Set<string>(); const deletedIds = new Set<string>(); let latestHistoryId = startHistoryId;
+  async listHistory(startHistoryId: string, maxPages = 8) {
+    let pageToken: string | undefined; const ids = new Set<string>(); const deletedIds = new Set<string>(); let latestHistoryId = startHistoryId; let pages = 0; let truncated = false;
     do {
       const params = new URLSearchParams({ startHistoryId }); if (pageToken) params.set("pageToken", pageToken);
       const data = await this.request<{
@@ -74,10 +84,11 @@ export class GoogleMailProvider implements MailProvider {
         entry.labelsRemoved?.forEach(({ message }) => ids.add(message.id));
         entry.messagesDeleted?.forEach(({ message }) => deletedIds.add(message.id));
       });
-      latestHistoryId = data.historyId; pageToken = data.nextPageToken;
-    } while (pageToken);
+      latestHistoryId = data.historyId; pageToken = data.nextPageToken; pages += 1;
+      if (pageToken && pages >= maxPages) truncated = true;
+    } while (pageToken && !truncated);
     deletedIds.forEach((id) => ids.delete(id));
-    return { messageIds: [...ids], deletedMessageIds: [...deletedIds], latestHistoryId };
+    return { messageIds: [...ids], deletedMessageIds: [...deletedIds], latestHistoryId, truncated };
   }
   async send(message: OutgoingMail): Promise<ProviderSendResult> {
     const boundary = `kym_${crypto.randomUUID()}`;
@@ -93,11 +104,26 @@ export class GoogleMailProvider implements MailProvider {
       ...(message.replyToMessageId ? [`In-Reply-To: ${safeHeader(message.replyToMessageId)}`, `References: ${safeHeader(message.replyToMessageId)}`] : [])
     ];
     const attachments = message.attachments ?? [];
+    const htmlBody = message.htmlBody ?? buildProfessionalEmailHtml({ from: message.from, subject: message.subject, body: message.textBody });
+    const alternativeBoundary = `kym_alt_${crypto.randomUUID()}`;
+    const alternative = [
+      `--${alternativeBoundary}`,
+      "Content-Type: text/plain; charset=UTF-8",
+      "Content-Transfer-Encoding: base64",
+      "",
+      base64Lines(message.textBody),
+      `--${alternativeBoundary}`,
+      "Content-Type: text/html; charset=UTF-8",
+      "Content-Transfer-Encoding: base64",
+      "",
+      base64Lines(htmlBody),
+      `--${alternativeBoundary}--`
+    ];
     let mime: string[];
     if (!attachments.length) {
-      mime = [...headers, "Content-Type: text/plain; charset=UTF-8", "Content-Transfer-Encoding: base64", "", base64Lines(message.textBody)];
+      mime = [...headers, `Content-Type: multipart/alternative; boundary="${alternativeBoundary}"`, "", ...alternative];
     } else {
-      const parts = [`--${boundary}`, "Content-Type: text/plain; charset=UTF-8", "Content-Transfer-Encoding: base64", "", base64Lines(message.textBody)];
+      const parts = [`--${boundary}`, `Content-Type: multipart/alternative; boundary="${alternativeBoundary}"`, "", ...alternative];
       for (const attachment of attachments) {
         const filename = safeHeader(attachment.filename).replaceAll('"', "") || "attachment";
         parts.push(`--${boundary}`, `Content-Type: ${safeHeader(attachment.mimeType)}; name=\"${filename}\"`, "Content-Transfer-Encoding: base64", `Content-Disposition: attachment; filename=\"${filename}\"`, "", base64Lines(attachment.content));

@@ -4,6 +4,8 @@ import { toSafeError, ValidationError } from "@/lib/errors";
 import { log } from "@/lib/logger";
 import { validateAttachmentFiles } from "@/lib/mail/attachment-validation";
 import { validateComposeInput } from "@/lib/mail/compose-validation";
+import { buildProfessionalEmailHtml, defaultEmailLookForSender, isEmailLook } from "@/lib/mail/professional-html";
+import { loadForwardedAttachments, parseForwardAttachmentIds } from "@/lib/mail/forwarded-attachments";
 import { loadGoogleProvider, syncGmailMessageById } from "@/lib/mail/gmail-sync";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { z } from "zod";
@@ -37,6 +39,8 @@ export async function POST(request: NextRequest) {
     if (!validateAttachmentFiles(files)) {
       throw new ValidationError("One or more attachments are unsupported or too large.");
     }
+    const forwardAttachmentIds = parseForwardAttachmentIds(form.getAll("forwardAttachmentIds"));
+    if (!forwardAttachmentIds) throw new ValidationError("The forwarded attachment selection is invalid.");
 
     const { data: identity, error: identityError } = await owner.database.from("mail_accounts")
       .select("id, mail_connection_id")
@@ -60,6 +64,16 @@ export async function POST(request: NextRequest) {
 
     const database = createSupabaseAdminClient();
     const { provider } = await loadGoogleProvider(database, identity.mail_connection_id);
+    const uploadedAttachments = await Promise.all(files.map(async (file) => ({ filename: file.name, mimeType: file.type || "application/octet-stream", content: new Uint8Array(await file.arrayBuffer()) })));
+    const forwardedAttachments = await loadForwardedAttachments(
+      database,
+      owner.user.id,
+      identity.mail_connection_id,
+      forwardAttachmentIds,
+      uploadedAttachments.map((attachment) => ({ name: attachment.filename, size: attachment.content.byteLength }))
+    );
+    const rawLook = form.get("emailLook");
+    const look = isEmailLook(rawLook) ? rawLook : defaultEmailLookForSender(input.from);
     const result = await provider.send({
       from: input.from,
       to: input.to,
@@ -67,15 +81,16 @@ export async function POST(request: NextRequest) {
       bcc: input.bcc,
       subject: input.subject,
       textBody: input.body,
+      htmlBody: buildProfessionalEmailHtml({ from: input.from, subject: input.subject, body: input.body, look }),
       threadId: input.providerThreadId,
       replyToMessageId: input.replyToMessageId,
-      attachments: await Promise.all(files.map(async (file) => ({ filename: file.name, mimeType: file.type || "application/octet-stream", content: new Uint8Array(await file.arrayBuffer()) })))
+      attachments: [...forwardedAttachments, ...uploadedAttachments]
     });
 
     let synchronized = true;
     try { await syncGmailMessageById(database, identity.mail_connection_id, result.messageId, projectId); }
     catch { synchronized = false; }
-    log("info", "mail.message_sent", { mailConnectionId: identity.mail_connection_id, synchronized, attachmentCount: files.length, projectAssociated: Boolean(projectId) });
+    log("info", "mail.message_sent", { mailConnectionId: identity.mail_connection_id, synchronized, attachmentCount: files.length + forwardedAttachments.length, projectAssociated: Boolean(projectId), forwardedAttachmentCount: forwardedAttachments.length });
     return NextResponse.json({ sent: true, synchronized, messageId: result.messageId, threadId: result.threadId }, { status: synchronized ? 200 : 202 });
   } catch (error) {
     const safeError = toSafeError(error);

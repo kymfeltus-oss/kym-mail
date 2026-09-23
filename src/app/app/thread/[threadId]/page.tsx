@@ -2,8 +2,9 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { Paperclip } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { ComposeForm } from "@/components/compose-form";
+import { MessageActions } from "@/components/message-actions";
 import { getOwnerContext } from "@/lib/auth/owner-context";
+import { selectForwardableAttachments } from "@/lib/mail/attachment-validation";
 import { formatMailTimestamp } from "@/lib/mail/date-format";
 
 export const metadata = { title: "Thread" };
@@ -25,25 +26,46 @@ export default async function ThreadPage({ params }: { params: Promise<{ threadI
   if (projectError) throw new Error("THREAD_UNAVAILABLE");
   const messageIds = (messages ?? []).map((message) => message.id);
   const { data: attachments, error: attachmentError } = messageIds.length
-    ? await owner.database.from("mail_attachments").select("id, message_id, filename, mime_type, size_bytes").eq("owner_id", owner.user.id).in("message_id", messageIds)
+    ? await owner.database.from("mail_attachments").select("id, message_id, provider_attachment_id, filename, mime_type, size_bytes").eq("owner_id", owner.user.id).in("message_id", messageIds)
     : { data: [], error: null };
   if (attachmentError) throw new Error("THREAD_UNAVAILABLE");
   const attachmentsByMessage = new Map<string, typeof attachments>();
   for (const attachment of attachments ?? []) attachmentsByMessage.set(attachment.message_id, [...(attachmentsByMessage.get(attachment.message_id) ?? []), attachment]);
   const identityEmails = new Map((identities ?? []).map((identity) => [identity.id, identity.email_address]));
   const lastMessage = messages?.at(-1);
-  const replyTo = lastMessage ? (lastMessage.is_sent ? lastMessage.to_addresses[0] : lastMessage.from_address) : "";
-  const replySubject = thread.subject.toLowerCase().startsWith("re:") ? thread.subject : `Re: ${thread.subject}`;
+  const activeProjects = project?.status === "ACTIVE" ? [{ id: project.id, name: project.name, default_mail_account_id: project.default_mail_account_id }] : [];
 
   return <AppShell email={owner.user.email} canSignOut={owner.mode === "authenticated"} active={lastMessage?.is_sent ? "sent" : "inbox"}>
     <div className="mx-auto max-w-4xl">
       <p className="text-xs font-semibold uppercase tracking-[.22em] text-[#D95B72]">Conversation</p><h1 className="mt-2 text-2xl font-semibold tracking-[-.025em] text-[#183A5A] sm:text-3xl">{thread.subject}</h1>{project && <Link href={`/app/projects/${project.id}`} className="mt-3 inline-flex rounded-full bg-[#FFF3F4] px-3 py-1.5 text-xs font-semibold text-[#A73D52]">Project: {project.name}</Link>}
-      <div className="mt-7 space-y-4">{(messages ?? []).map((message) => <article key={message.id} className="rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-5 shadow-[0_14px_40px_rgba(24,58,90,.06)] sm:p-7">
+      <div className="mt-7 space-y-4">{(messages ?? []).map((message) => {
+        const messageAttachments = attachmentsByMessage.get(message.id) ?? [];
+        const forwardableAttachments = selectForwardableAttachments(messageAttachments.map((attachment) => ({ ...attachment, name: attachment.filename, size: Number(attachment.size_bytes), providerAttachmentId: attachment.provider_attachment_id })));
+        return <article key={message.id} className="rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-5 shadow-[0_14px_40px_rgba(24,58,90,.06)] sm:p-7">
         <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[#E8E2E3] pb-4"><div><p className="text-sm font-semibold text-[#183A5A]">From: {message.from_address}</p><p className="mt-1 text-xs text-[#64748B]">To: {message.to_addresses.join(", ") || "Undisclosed recipient"}</p>{message.cc_addresses.length > 0 && <p className="mt-1 text-xs text-[#64748B]">CC: {message.cc_addresses.join(", ")}</p>}<p className="mt-2 text-[11px] font-semibold uppercase tracking-[.1em] text-[#A73D52]">{identityEmails.get(message.mail_account_id) ?? "KYM Mail"}</p></div><time className="text-xs text-[#64748B]" dateTime={message.sent_at}>{formatMailTimestamp(message.sent_at)}</time></header>
         {message.sanitized_html_body ? <div className="email-content mt-5 text-sm leading-7 text-[#243B53]" dangerouslySetInnerHTML={{ __html: message.sanitized_html_body }} /> : <p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-[#243B53]">{message.text_body || "This message has no displayable body."}</p>}
-        {(attachmentsByMessage.get(message.id) ?? []).length > 0 && <ul className="mt-5 space-y-2 border-t border-[#E8E2E3] pt-4">{(attachmentsByMessage.get(message.id) ?? []).map((attachment) => <li key={attachment.id}><a href={`/api/mail/attachments/${attachment.id}`} className="flex items-center gap-2 text-xs font-semibold text-[#A73D52] hover:underline"><Paperclip className="size-3.5" /> {attachment.filename} · {(Number(attachment.size_bytes) / 1024).toFixed(1)} KB</a></li>)}</ul>}
-      </article>)}</div>
-      {lastMessage && identities?.length && <section className="mt-8"><h2 className="mb-4 text-lg font-semibold text-[#183A5A]">Reply</h2><ComposeForm identities={identities} projects={project?.status === "ACTIVE" ? [{ id: project.id, name: project.name, default_mail_account_id: project.default_mail_account_id }] : []} initialProjectId={project?.status === "ACTIVE" ? project.id : ""} reply={{ to: replyTo, subject: replySubject, providerThreadId: thread.provider_thread_id, replyToMessageId: lastMessage.internet_message_id ?? "" }} /></section>}
+        {messageAttachments.length > 0 && <ul className="mt-5 space-y-2 border-t border-[#E8E2E3] pt-4">{messageAttachments.map((attachment) => <li key={attachment.id}><a href={`/api/mail/attachments/${attachment.id}`} className="flex items-center gap-2 text-xs font-semibold text-[#A73D52] hover:underline"><Paperclip className="size-3.5" /> {attachment.filename} · {(Number(attachment.size_bytes) / 1024).toFixed(1)} KB</a></li>)}</ul>}
+        {identities?.length ? <MessageActions
+          message={{
+            id: message.id,
+            identityEmail: identityEmails.get(message.mail_account_id) ?? "",
+            fromAddress: message.from_address,
+            toAddresses: message.to_addresses,
+            ccAddresses: message.cc_addresses,
+            subject: message.subject,
+            textBody: message.text_body,
+            sentAtLabel: formatMailTimestamp(message.sent_at),
+            internetMessageId: message.internet_message_id,
+            providerThreadId: thread.provider_thread_id,
+            attachments: forwardableAttachments.map((attachment) => ({ id: attachment.id, filename: attachment.filename, sizeBytes: attachment.size })),
+            unavailableAttachmentCount: messageAttachments.length - forwardableAttachments.length
+          }}
+          identities={identities}
+          projects={activeProjects}
+          initialProjectId={project?.status === "ACTIVE" ? project.id : ""}
+          threadPath={`/app/thread/${thread.id}`}
+        /> : null}
+      </article>})}</div>
     </div>
   </AppShell>;
 }

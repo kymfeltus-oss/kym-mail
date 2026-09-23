@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { z } from "zod";
 import { BriefcaseBusiness, Building2, Handshake, Shapes, Users } from "lucide-react";
@@ -264,7 +265,7 @@ export function ProjectForm({ identities, project }: { identities: ProjectIdenti
         </select>
         <FieldError id="project-identity-error" message={fieldErrors.defaultMailAccountId} />
       </label>
-      {!availableIdentities.length && <p role="alert" className="rounded-2xl border border-[#F0C9D0] bg-[#FFF3F4] px-4 py-3 text-sm text-[#A73D52]">Connect Google Mail and make a verified sender available before saving a Project.</p>}
+      {!availableIdentities.length && <p role="alert" className="rounded-2xl border border-[#F0C9D0] bg-[#FFF3F4] px-4 py-3 text-sm text-[#A73D52]">Connect Google Mail and make a verified sender available before saving a Project. <Link href="/api/oauth/google/start" className="font-semibold underline decoration-[#D95B72] underline-offset-2">Reconnect Google Mail</Link></p>}
       {project?.default_mail_account_id && !selectedIdentityAvailable && <p role="alert" className="rounded-2xl border border-[#F0C9D0] bg-[#FFF3F4] px-4 py-3 text-sm text-[#A73D52]">This Project’s previous default sender is unavailable. Select a verified identity before saving.</p>}
     </div>
     {formError && <p role="alert" className="mt-5 rounded-2xl border border-[#F0C9D0] bg-[#FFF3F4] px-5 py-4 text-sm font-semibold text-[#A73D52]">{formError}</p>}

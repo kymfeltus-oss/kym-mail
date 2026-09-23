@@ -2,7 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AlertTriangle, ArrowRight, BriefcaseBusiness, CalendarCheck2, CalendarClock, FileCheck2, FolderKanban, Inbox, MailCheck, Plus, SquarePen } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { GmailConnectionPanel } from "@/components/gmail-connection-panel";
 import { getOwnerContext } from "@/lib/auth/owner-context";
+import { googleMailOauthMessage } from "@/lib/mail/connection-status";
 import { formatMailTimestamp } from "@/lib/mail/date-format";
 import { projectStatusLabels, projectTypeLabels, type ProjectStatus, type ProjectType } from "@/lib/projects/validation";
 
@@ -16,11 +18,12 @@ const activityLabels: Record<string, string> = {
   REPLY_RECEIVED: "Reply received"
 };
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ mailError?: string; mailConnected?: string }> }) {
   const owner = await getOwnerContext();
   if (!owner?.user.email) redirect("/sign-in");
   const { database, user } = owner;
   const now = new Date().toISOString();
+  const query = await searchParams;
   const [
     { count: unreadCount, error: unreadError },
     { count: activeProjectCount, error: projectCountError },
@@ -34,7 +37,8 @@ export default async function DashboardPage() {
     { data: recentJobs, error: recentJobsError },
     { count: pendingConsultations, error: pendingConsultationsError },
     { count: upcomingConsultations, error: upcomingConsultationsError },
-    { data: nextConsultation, error: nextConsultationError }
+    { data: nextConsultation, error: nextConsultationError },
+    { data: connection, error: connectionError }
   ] = await Promise.all([
     database.from("mail_threads").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("is_unread", true),
     database.from("projects").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("status", "ACTIVE"),
@@ -48,9 +52,10 @@ export default async function DashboardPage() {
     database.from("job_opportunities").select("id, title, company_name, location_text, saved_at").eq("owner_id", user.id).eq("status", "SAVED").order("saved_at", { ascending: false }).limit(3),
     database.from("consultation_requests").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("payment_status", "PAYMENT_SUBMITTED"),
     database.from("consultation_requests").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("payment_status", "BOOKED").gte("booking_start_at", now),
-    database.from("consultation_requests").select("client_name, booking_start_at").eq("owner_id", user.id).eq("payment_status", "BOOKED").gte("booking_start_at", now).order("booking_start_at").limit(1).maybeSingle()
+    database.from("consultation_requests").select("client_name, booking_start_at").eq("owner_id", user.id).eq("payment_status", "BOOKED").gte("booking_start_at", now).order("booking_start_at").limit(1).maybeSingle(),
+    database.from("mail_connections").select("provider_account_id, connection_state, initial_sync_completed_at, last_synced_at, sync_error").eq("owner_id", user.id).eq("provider", "google").maybeSingle()
   ]);
-  if (unreadError || projectCountError || projectsError || threadsError || identitiesError || activityError || scheduledCountError || nextScheduledError || savedJobsCountError || recentJobsError || pendingConsultationsError || upcomingConsultationsError || nextConsultationError) throw new Error("DASHBOARD_UNAVAILABLE");
+  if (unreadError || projectCountError || projectsError || threadsError || identitiesError || activityError || scheduledCountError || nextScheduledError || savedJobsCountError || recentJobsError || pendingConsultationsError || upcomingConsultationsError || nextConsultationError || connectionError) throw new Error("DASHBOARD_UNAVAILABLE");
 
   const activityProjectIds = [...new Set((activity ?? []).map((item) => item.project_id))];
   const { data: activityProjects, error: activityProjectsError } = activityProjectIds.length
@@ -71,6 +76,8 @@ export default async function DashboardPage() {
         <div><p className="text-xs font-semibold uppercase tracking-[.22em] text-[#D95B72]">KYM Mail workspace</p><h1 className="mt-2 text-3xl font-semibold tracking-[-.035em] text-[#183A5A] sm:text-5xl">Your work, in context.</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-[#64748B]">Move between real mail activity and the Projects guiding your outreach.</p></div>
         <div className="flex flex-wrap gap-3"><Link href="/app/projects/new" className="inline-flex items-center gap-2 rounded-full border border-[#E7B8C1] bg-[#FFF3F4] px-5 py-3 text-sm font-semibold text-[#A73D52]"><Plus className="size-4" /> New Project</Link><Link href="/app/compose" className="inline-flex items-center gap-2 rounded-full bg-[#D95B72] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(217,91,114,.22)]"><SquarePen className="size-4" /> Compose</Link></div>
       </header>
+
+      <GmailConnectionPanel connection={connection ?? null} availableIdentityCount={usableIdentities.length} oauthMessage={googleMailOauthMessage(query.mailError, query.mailConnected === "true")} />
 
       <section aria-label="Workspace summary" className="mt-9 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <Link href="/app/inbox" className="rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-6 shadow-[0_14px_42px_rgba(24,58,90,.06)] transition hover:-translate-y-0.5"><span className="grid size-10 place-items-center rounded-2xl bg-[#FFF3F4] text-[#D95B72]"><Inbox className="size-5" /></span><p className="mt-5 text-3xl font-semibold tracking-[-.04em] text-[#183A5A]">{unreadCount ?? 0}</p><p className="mt-1 text-sm text-[#64748B]">Unread thread{unreadCount === 1 ? "" : "s"}</p></Link>

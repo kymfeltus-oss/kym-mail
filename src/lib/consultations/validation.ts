@@ -24,7 +24,13 @@ export const consultationSettingsSchema = z.object({
   referenceInstructions: z.string().trim().max(500).optional().or(z.literal("")),
   firstTimeBookingUrl: calUrl,
   returningBookingUrl: calUrl,
+  clientSessionBookingUrl: calUrl.optional().or(z.literal("")),
+  clientSessionsActive: z.boolean().optional().default(false),
   isActive: z.boolean()
+}).superRefine((value, context) => {
+  if (value.clientSessionsActive && !value.clientSessionBookingUrl) {
+    context.addIssue({ code: "custom", path: ["clientSessionBookingUrl"], message: "Add the 15-minute Cal.com URL before opening client sessions." });
+  }
 });
 
 export const consultationReviewSchema = z.discriminatedUnion("decision", [

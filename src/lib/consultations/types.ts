@@ -24,6 +24,8 @@ export type ConsultationSettings = {
   paid_booking_url: string;
   free_booking_url: string | null;
   returning_booking_url: string | null;
+  client_session_booking_url: string | null;
+  client_sessions_active: boolean;
   scheduling_provider: "CAL_COM";
   is_active: boolean;
 };

@@ -31,9 +31,9 @@ function attendeeEmail(payload: Record<string, unknown>) {
   return null;
 }
 
-function consultationRequestId(payload: Record<string, unknown>) {
+function metadataUuid(payload: Record<string, unknown>, key: string) {
   const metadata = payload.metadata && typeof payload.metadata === "object" ? payload.metadata as Record<string, unknown> : null;
-  const value = stringValue(metadata?.consultationRequestId);
+  const value = stringValue(metadata?.[key]);
   return value && z.string().uuid().safeParse(value).success ? value : null;
 }
 
@@ -51,7 +51,8 @@ export function parseCalWebhook(rawBody: string) {
   if (!id) throw new Error("CALCOM_BOOKING_ID_MISSING");
   return {
     triggerEvent: parsed.triggerEvent,
-    requestId: consultationRequestId(payload),
+    requestId: metadataUuid(payload, "consultationRequestId"),
+    clientSessionBookingId: metadataUuid(payload, "clientSessionBookingId"),
     bookingId: id,
     eventTypeId: typeof payload.eventTypeId === "number" ? String(payload.eventTypeId) : stringValue(payload.eventTypeId),
     attendeeEmail: attendeeEmail(payload),

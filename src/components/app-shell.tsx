@@ -1,15 +1,16 @@
 import Image from "next/image";
 import Link from "next/link";
-import { BookOpenCheck, BriefcaseBusiness, CalendarClock, CalendarDays, FileUser, FolderKanban, Inbox, LayoutDashboard, LogOut, Send, SquarePen } from "lucide-react";
+import { BookOpenCheck, BriefcaseBusiness, CalendarClock, CalendarDays, FileUser, FolderKanban, Inbox, LayoutDashboard, LogOut, Send, SquarePen, Users } from "lucide-react";
 import { signOut } from "@/app/sign-in/actions";
 
-type ActiveView = "dashboard" | "inbox" | "sent" | "scheduled" | "calendar" | "projects" | "jobs" | "career" | "resumes" | "compose";
+type ActiveView = "dashboard" | "inbox" | "sent" | "scheduled" | "calendar" | "clients" | "projects" | "jobs" | "career" | "resumes" | "compose";
 const navigation = [
   { href: "/app", label: "Home", desktopLabel: "Dashboard", icon: LayoutDashboard, active: "dashboard" as const },
   { href: "/app/inbox", label: "Inbox", desktopLabel: "Inbox", icon: Inbox, active: "inbox" as const },
   { href: "/app/sent", label: "Sent", desktopLabel: "Sent", icon: Send, active: "sent" as const },
   { href: "/app/scheduled", label: "Schedule", desktopLabel: "Scheduled", icon: CalendarClock, active: "scheduled" as const },
   { href: "/app/calendar", label: "Calendar", desktopLabel: "Calendar", icon: CalendarDays, active: "calendar" as const },
+  { href: "/app/clients", label: "Clients", desktopLabel: "Clients", icon: Users, active: "clients" as const },
   { href: "/app/projects", label: "Projects", desktopLabel: "Projects", icon: FolderKanban, active: "projects" as const },
   { href: "/app/jobs", label: "Jobs", desktopLabel: "Jobs", icon: BriefcaseBusiness, active: "jobs" as const },
   { href: "/app/career", label: "Career", desktopLabel: "Career Profile", icon: BookOpenCheck, active: "career" as const },

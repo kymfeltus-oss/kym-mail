@@ -2,10 +2,11 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Bookmark, BriefcaseBusiness, Building2, CalendarDays, Check, ExternalLink, LoaderCircle, MapPin, Search, SlidersHorizontal, WalletCards, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, ArrowUpDown, Bookmark, BriefcaseBusiness, Building2, CalendarDays, Check, ExternalLink, LoaderCircle, MapPin, Search, SlidersHorizontal, WalletCards, X } from "lucide-react";
 import type { JobSearchRequest, JobSearchResponse, NormalizedJob } from "@/domain/providers/job-search-provider";
 import { JobsAttribution } from "@/components/jobs-attribution";
 import { employmentTypeLabels, formatJobPostedDate, formatJobSalary, workArrangementLabels } from "@/lib/jobs/format";
+import { isJobSearchSort, jobSearchSortLabels, jobSearchSorts, sortSearchJobs, type JobSearchSort } from "@/lib/jobs/search";
 
 type SearchJob = NormalizedJob & { isSaved: boolean; savedJobId: string | null };
 type SearchResponse = { request: JobSearchRequest; result: Omit<JobSearchResponse, "jobs"> & { jobs: SearchJob[] } };
@@ -25,6 +26,7 @@ export function JobSearchWorkspace({ projects, defaults, initialProjectId }: { p
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [sort, setSort] = useState<JobSearchSort>("BEST_MATCHED");
 
   async function executeSearch(input: typeof form) {
     setLoading(true); setError(""); setNotice("");
@@ -56,7 +58,7 @@ export function JobSearchWorkspace({ projects, defaults, initialProjectId }: { p
     finally { setSavingId(null); }
   }
 
-  const jobs = response?.result.jobs ?? [];
+  const jobs = sortSearchJobs(response?.result.jobs ?? [], sort);
   return <div className="mt-8 min-w-0">
     <form onSubmit={submit} className="rounded-[2rem] border border-[#E8E2E3] bg-[#FFFCFB] p-5 shadow-[0_20px_60px_rgba(24,58,90,.08)] sm:p-7">
       <label htmlFor="job-query" className="text-sm font-semibold text-[#183A5A]">Job title, keywords, skills, or phrases</label>
@@ -77,7 +79,7 @@ export function JobSearchWorkspace({ projects, defaults, initialProjectId }: { p
     {loading && <div aria-live="polite" className="mt-8 grid gap-4 lg:grid-cols-2">{[0,1,2,3].map((item) => <div key={item} className="h-64 animate-pulse rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB]" />)}</div>}
 
     {!loading && response && <section aria-labelledby="job-results-title" className="mt-9">
-      <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-[.16em] text-[#D95B72]">Real provider results</p><h2 id="job-results-title" className="mt-1 text-2xl font-semibold text-[#183A5A]">{response.result.total.toLocaleString()} opportunities found</h2><p className="mt-2 text-sm text-[#64748B]">Showing normalized, deduplicated listings from Adzuna.</p></div><JobsAttribution /></div>
+      <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-[.16em] text-[#D95B72]">Real provider results</p><h2 id="job-results-title" className="mt-1 text-2xl font-semibold text-[#183A5A]">{response.result.total.toLocaleString()} opportunities found</h2><p className="mt-2 text-sm text-[#64748B]">Showing normalized, deduplicated listings from Adzuna. Best matched uses the search terms that actually appear in each listing.</p></div><div className="flex flex-wrap items-end gap-3">{jobs.length > 0 && <label className="grid gap-2 text-xs font-semibold text-[#64748B]">Sort results<select aria-label="Sort job results" value={sort} onChange={(event) => { if (isJobSearchSort(event.target.value)) setSort(event.target.value); }} className={`${inputClass()} min-w-48`}>{jobSearchSorts.map((option) => <option key={option} value={option}>{jobSearchSortLabels[option]}</option>)}</select></label>}<JobsAttribution /></div></div>
       {!jobs.length ? <div className="mt-6 rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-8 text-center"><BriefcaseBusiness className="mx-auto size-8 text-[#D95B72]" /><h3 className="mt-4 text-lg font-semibold text-[#183A5A]">No jobs matched this search</h3><p className="mt-2 text-sm leading-6 text-[#64748B]">Try broader keywords, a wider location, or fewer filters. KYM Mail will never fill this state with fabricated listings.</p></div> : <div className="mt-6 grid min-w-0 gap-5 lg:grid-cols-2">{jobs.map((job) => {
         const salary = formatJobSalary(job); const posted = formatJobPostedDate(job.postedAt);
         return <article key={`${job.provider}:${job.providerJobId}`} className="flex min-w-0 flex-col rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-5 shadow-[0_14px_42px_rgba(24,58,90,.06)] sm:p-6"><div className="flex min-w-0 items-start justify-between gap-4"><div className="min-w-0"><h3 className="break-words text-lg font-semibold leading-7 text-[#183A5A]">{job.title}</h3><p className="mt-1 flex items-center gap-2 text-sm font-semibold text-[#64748B]"><Building2 className="size-4 shrink-0 text-[#D95B72]" /><span className="truncate">{job.companyName}</span></p></div>{job.isSaved && <span className="shrink-0 rounded-full bg-[#F7DDE1] px-3 py-1 text-[10px] font-semibold uppercase tracking-[.1em] text-[#A73D52]">Saved</span>}</div>
