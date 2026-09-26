@@ -3,7 +3,9 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarClock, Paperclip, Send, X } from "lucide-react";
-import { buildProfessionalEmailHtml, defaultEmailLookForSender, emailLooks, isEmailLook, type EmailLook } from "@/lib/mail/professional-html";
+import { readApiJson } from "@/lib/http/read-api-json";
+import { validateAttachmentFiles } from "@/lib/mail/attachment-validation";
+import { buildProfessionalEmailHtml, defaultEmailLookForSender, emailLookChrome, emailLooks, isEmailLook, type EmailLook } from "@/lib/mail/professional-html";
 
 export type ComposeIdentity = { id: string; email_address: string; label: string; is_default: boolean };
 export type ComposeProject = { id: string; name: string; default_mail_account_id: string | null };
@@ -50,14 +52,12 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
   const [body, setBody] = useState(draft?.body ?? "");
   const [subject, setSubject] = useState(draft?.subject ?? "");
   const [look, setLook] = useState<EmailLook>(() => defaultEmailLookForSender(from, draftIdentity?.label ?? initialProjectIdentity?.label ?? globalDefault?.label ?? ""));
-  const selectedIdentity = identities.find((identity) => identity.email_address === from);
   const selectedProject = projects.find((project) => project.id === projectId);
+  const previewChrome = emailLookChrome(look);
   const defaultIdentityUnavailable = Boolean(selectedProject && !identities.some((identity) => identity.id === selectedProject.default_mail_account_id));
 
   function applyFrom(nextFrom: string) {
-    const identity = identities.find((item) => item.email_address === nextFrom);
     setFrom(nextFrom);
-    setLook(defaultEmailLookForSender(nextFrom, identity?.label ?? ""));
   }
 
   function selectProject(nextProjectId: string) {
@@ -70,11 +70,14 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setStatus("sending"); setError(null);
+    if (!validateAttachmentFiles(files)) {
+      setStatus("error"); setError("One or more attachments are unsupported or too large."); return;
+    }
     const data = new FormData(event.currentTarget);
     data.delete("attachments"); files.forEach((file) => data.append("attachments", file));
     try {
       const response = await fetch("/api/mail/send", { method: "POST", body: data });
-      const payload = await response.json() as { error?: string; sent?: boolean };
+      const payload = await readApiJson<{ error?: string; sent?: boolean }>(response);
       if (!response.ok && !payload.sent) throw new Error(payload.error || "The message could not be sent.");
       formRef.current?.reset(); setFiles([]); setForwardedAttachments([]); setBody(""); setSubject(""); onSent?.();
       if (successPath) router.push(successPath); else router.push("/app/sent?sent=true");
@@ -91,13 +94,16 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
     if (!scheduledLocal || !Number.isFinite(instant.getTime()) || instant.getTime() <= Date.now()) {
       setStatus("error"); setError("Choose a valid future delivery date and time."); return;
     }
+    if (!validateAttachmentFiles(files)) {
+      setStatus("error"); setError("One or more attachments are unsupported or too large."); return;
+    }
     setStatus("scheduling"); setError(null);
     const data = new FormData(form);
     data.delete("attachments"); files.forEach((file) => data.append("attachments", file));
     data.set("scheduledFor", instant.toISOString()); data.set("timezone", timezone);
     try {
       const response = await fetch("/api/mail/schedule", { method: "POST", body: data });
-      const payload = await response.json() as { error?: string; id?: string };
+      const payload = await readApiJson<{ error?: string; id?: string }>(response);
       if (!response.ok || !payload.id) throw new Error(payload.error || "The email could not be scheduled.");
       router.push(`/app/scheduled/${payload.id}?scheduled=true`); router.refresh();
     } catch (cause) {
@@ -128,11 +134,11 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
           {identities.map((identity) => <option key={identity.id} value={identity.email_address}>{identity.email_address} — {identity.label}</option>)}
         </select>
       </label>
-      <label className="grid min-w-0 gap-2 text-sm font-semibold text-[#183A5A]">Stationery
+      <label className="grid min-w-0 gap-2 text-sm font-semibold text-[#183A5A]">Company
         <select name="emailLook" value={look} onChange={(event) => { if (isEmailLook(event.target.value)) setLook(event.target.value); }} className="w-full min-w-0 rounded-xl border border-[#E8E2E3] bg-[#FFFCFB] px-4 py-3 font-normal text-[#183A5A] outline-none focus:border-[#D95B72]">
-          {emailLooks.map((option) => <option key={option.id} value={option.id}>{option.name} — {option.description}</option>)}
+          {emailLooks.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
         </select>
-        <span className="font-normal text-[#64748B]">{from === "kym@kymmailapp.com" || /\bpersonal\b/i.test(selectedIdentity?.label ?? "") ? "Personal keeps the editorial look. Switch From to send on company stationery." : "This sender uses company stationery. Switch From to use the personal editorial look."}</span>
+        <span className="font-normal text-[#64748B]">The selected company stationery and your signature go to the recipient.</span>
       </label>
       <label className="grid min-w-0 gap-2 text-sm font-semibold text-[#183A5A]">To
         <input name="to" type="text" inputMode="email" required defaultValue={draft?.to} placeholder="recipient@example.com" className="w-full min-w-0 rounded-xl border border-[#E8E2E3] bg-[#FFFCFB] px-4 py-3 font-normal outline-none placeholder:text-[#94A3B8] focus:border-[#D95B72]" />
@@ -149,9 +155,9 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
         <textarea name="body" required rows={12} value={body} onChange={(event) => setBody(event.target.value)} placeholder="Write your message…" className="w-full min-w-0 resize-y rounded-xl border border-[#E8E2E3] bg-[#FFFCFB] px-4 py-3 font-normal leading-7 outline-none placeholder:text-[#94A3B8] focus:border-[#D95B72]" />
         <span className="font-normal text-[#64748B]">Blank lines become paragraphs. Lines that start with - become a list. The recipient receives this designed version.</span>
       </label>
-      <section aria-label="Recipient preview" className={look === "personal" ? "border border-[#1A1A1A] bg-[#111111] p-3" : "border border-[#183A5A] bg-[#183A5A] p-3"}>
-        <p className={`px-2 text-[10px] font-semibold uppercase tracking-[.28em] ${look === "personal" ? "text-[#C4A574]" : "text-[#E7B8C1]"}`}>Recipient preview</p>
-        <iframe title="How the recipient will see this message" sandbox="" srcDoc={buildProfessionalEmailHtml({ from: from || "your verified sender", subject: subject || "Message preview", body: body || "Your message will appear here.", look })} className={`mt-3 h-[420px] w-full border-0 ${look === "personal" ? "bg-[#111111]" : "bg-[#E8EEF4]"}`} />
+      <section aria-label="Recipient preview" className="border p-3" style={{ background: previewChrome.masthead, borderColor: previewChrome.masthead }}>
+        <p className="px-2 text-[10px] font-semibold uppercase tracking-[.28em]" style={{ color: previewChrome.accent }}>Recipient preview</p>
+        <iframe title="How the recipient will see this message" sandbox="" srcDoc={buildProfessionalEmailHtml({ from: from || "your verified sender", subject: subject || "Message preview", body: body || "Your message will appear here.", look })} className="mt-3 h-[520px] w-full border-0" style={{ background: previewChrome.page }} />
       </section>
       <div>
         <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-[#E8E2E3] px-4 py-2 text-xs font-semibold text-[#183A5A] transition hover:bg-[#FFF3F4]"><Paperclip className="size-4 text-[#D95B72]" /> Attach files<input name="attachments" type="file" multiple className="sr-only" onChange={(event) => setFiles(Array.from(event.target.files ?? []))} /></label>

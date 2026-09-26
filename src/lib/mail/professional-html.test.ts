@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildProfessionalEmailHtml, defaultEmailLookForSender, formatMessageHtml } from "./professional-html";
+import { buildProfessionalEmailHtml, defaultEmailLookForSender, emailLooks, formatMessageHtml } from "./professional-html";
 
 describe("professional outgoing email HTML", () => {
   it("turns the written message into paragraphs and lists without changing the words", () => {
@@ -11,7 +11,7 @@ describe("professional outgoing email HTML", () => {
     expect(html).toContain("Kym");
   });
 
-  it("uses the editorial look for the personal sender", () => {
+  it("uses the editorial look and signature for personal stationery", () => {
     expect(defaultEmailLookForSender("kym@kymmailapp.com", "Personal / professional")).toBe("personal");
     const html = buildProfessionalEmailHtml({
       from: "kym@kymmailapp.com",
@@ -20,22 +20,34 @@ describe("professional outgoing email HTML", () => {
     });
     expect(html).toContain("KYM");
     expect(html).toContain("Private correspondence");
-    expect(html).toContain("Sent by kym@kymmailapp.com");
+    expect(html).toContain("Kym Feltus");
+    expect(html).toContain("470-736-1132");
+    expect(html).toContain("mailto:kym@kymmailapp.com");
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
     expect(html).not.toContain("<script>alert(1)</script>");
     expect(html).toContain('href="https://kymmailapp.com/consult"');
   });
 
-  it("uses company stationery for the business sender", () => {
-    expect(defaultEmailLookForSender("info@kymmailapp.com", "General / business")).toBe("business");
-    const html = buildProfessionalEmailHtml({
-      from: "info@kymmailapp.com",
-      subject: "Project update",
-      body: "The packet is ready."
-    });
-    expect(html).toContain("KYM MAIL");
-    expect(html).toContain("Company correspondence");
-    expect(html).toContain("Sent by info@kymmailapp.com");
-    expect(html).toContain("The packet is ready.");
+  it("renders each company look with the matching masthead and signature", () => {
+    const companies = [
+      { look: "snaptax" as const, wordmark: "SNAPTAX", company: "SnapTax" },
+      { look: "securafin" as const, wordmark: "SECURAFIN-AI", company: "SecuraFin-AI" },
+      { look: "parable" as const, wordmark: "PARABLE", company: "PARABLE" },
+      { look: "mass" as const, wordmark: "MASS DEVELOPMENT GROUP", company: "MASS DEVELOPMENT GROUP" }
+    ];
+    for (const company of companies) {
+      const html = buildProfessionalEmailHtml({
+        from: "info@kymmailapp.com",
+        subject: "Project update",
+        body: "The packet is ready.",
+        look: company.look
+      });
+      expect(html).toContain(company.wordmark);
+      expect(html).toContain(company.company);
+      expect(html).toContain("Kym Feltus");
+      expect(html).toContain("470-736-1132");
+      expect(html).toContain("The packet is ready.");
+    }
+    expect(emailLooks.map((look) => look.id)).toEqual(["personal", "snaptax", "securafin", "parable", "mass"]);
   });
 });

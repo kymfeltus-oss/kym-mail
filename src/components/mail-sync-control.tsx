@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { readApiJson } from "@/lib/http/read-api-json";
 import { formatMailTimestamp } from "@/lib/mail/date-format";
 
 type State = "idle" | "syncing" | "complete" | "error";
@@ -17,7 +18,7 @@ export function MailSyncControl({ connected, initialSyncComplete, lastSyncedAt, 
     setState("syncing"); setError(null);
     try {
       const response = await fetch("/api/mail/sync", { method: "POST" });
-      const payload = await response.json() as { error?: string };
+      const payload = await readApiJson<{ error?: string }>(response);
       if (!response.ok) throw new Error(payload.error || "Mailbox synchronization could not be completed.");
       setState("complete"); router.refresh();
     } catch (cause) {

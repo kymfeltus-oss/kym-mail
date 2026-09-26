@@ -14,7 +14,7 @@ const navigation = [
   { href: "/app/projects", label: "Projects", desktopLabel: "Projects", icon: FolderKanban, active: "projects" as const },
   { href: "/app/jobs", label: "Jobs", desktopLabel: "Jobs", icon: BriefcaseBusiness, active: "jobs" as const },
   { href: "/app/career", label: "Career", desktopLabel: "Career Profile", icon: BookOpenCheck, active: "career" as const },
-  { href: "/app/resumes/master", label: "Resume", desktopLabel: "Master Resume", icon: FileUser, active: "resumes" as const },
+  { href: "/app/resumes", label: "Resume", desktopLabel: "Resume", icon: FileUser, active: "resumes" as const },
   { href: "/app/compose", label: "Compose", desktopLabel: "Compose", icon: SquarePen, active: "compose" as const }
 ];
 

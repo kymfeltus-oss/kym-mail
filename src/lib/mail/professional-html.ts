@@ -16,21 +16,28 @@ function linkify(escaped: string, color: string, underline: string) {
 }
 
 export const emailLooks = [
-  { id: "personal", name: "Personal", description: "Private editorial stationery" },
-  { id: "business", name: "KYM Mail", description: "Company stationery" }
+  { id: "personal", name: "Personal", company: null, description: "Private editorial stationery" },
+  { id: "snaptax", name: "SnapTax", company: "SnapTax", description: "SnapTax stationery" },
+  { id: "securafin", name: "SecuraFin-AI", company: "SecuraFin-AI", description: "SecuraFin-AI stationery" },
+  { id: "parable", name: "PARABLE", company: "PARABLE", description: "PARABLE stationery" },
+  { id: "mass", name: "MASS DEVELOPMENT GROUP", company: "MASS DEVELOPMENT GROUP", description: "MASS DEVELOPMENT GROUP stationery" }
 ] as const;
 
 export type EmailLook = (typeof emailLooks)[number]["id"];
 
+export const ownerSignature = {
+  name: "Kym Feltus",
+  phone: "470-736-1132"
+} as const;
+
 export function isEmailLook(value: unknown): value is EmailLook {
-  return value === "personal" || value === "business";
+  return typeof value === "string" && emailLooks.some((look) => look.id === value);
 }
 
 export function defaultEmailLookForSender(from: string, label = "") {
   const email = from.trim().toLowerCase();
-  if (email === "kym@kymmailapp.com") return "personal" as const;
-  if (/\bpersonal\b/i.test(label)) return "personal" as const;
-  return "business" as const;
+  if (email === "kym@kymmailapp.com" || /\bpersonal\b/i.test(label)) return "personal" as const;
+  return "personal" as const;
 }
 
 const looks = {
@@ -48,27 +55,94 @@ const looks = {
     body: "color:#1A1A1A;font-size:16px;line-height:1.75;font-family:Helvetica Neue,Helvetica,Arial,sans-serif",
     link: "#6B1D2A",
     linkLine: "#C4A574",
-    footerBorder: "#D4CBB8",
-    footerStyle: "margin:0;padding-top:20px;border-top:1px solid #D4CBB8;color:#6F675C;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:10px;letter-spacing:.18em;text-transform:uppercase"
+    signName: "margin:0;color:#0B0B0B;font-family:Didot,'Bodoni MT',Georgia,'Times New Roman',serif;font-size:18px",
+    signMeta: "margin:6px 0 0;color:#6F675C;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:13px;line-height:1.55"
   },
-  business: {
-    page: "#E8EEF4",
+  snaptax: {
+    page: "#F3F6F2",
     card: "#FFFFFF",
-    cardBorder: "#C9D4E0",
-    masthead: "#183A5A",
-    wordmark: "KYM MAIL",
-    wordmarkStyle: "margin:0;color:#FFFFFF;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:15px;font-weight:600;letter-spacing:.34em",
-    kicker: "Company correspondence",
-    kickerStyle: "margin:10px 0 0;color:#E7B8C1;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:10px;letter-spacing:.28em;text-transform:uppercase",
-    rule: "#D95B72",
-    subjectStyle: "margin:0 0 24px;color:#183A5A;font-family:Georgia,'Times New Roman',serif;font-size:20px;font-weight:400;line-height:1.4",
-    body: "color:#243447;font-size:16px;line-height:1.7;font-family:Helvetica Neue,Helvetica,Arial,sans-serif",
-    link: "#A73D52",
-    linkLine: "#D95B72",
-    footerBorder: "#E8E2E3",
-    footerStyle: "margin:0;padding-top:20px;border-top:1px solid #E8E2E3;color:#64748B;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:10px;letter-spacing:.16em;text-transform:uppercase"
+    cardBorder: "#C9D4C4",
+    masthead: "#1B4D3E",
+    wordmark: "SNAPTAX",
+    wordmarkStyle: "margin:0;color:#F7F3E8;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:18px;font-weight:700;letter-spacing:.28em",
+    kicker: "Tax correspondence",
+    kickerStyle: "margin:10px 0 0;color:#D4C08A;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:10px;letter-spacing:.28em;text-transform:uppercase",
+    rule: "#C4A574",
+    subjectStyle: "margin:0 0 24px;color:#1B4D3E;font-family:Georgia,'Times New Roman',serif;font-size:20px;font-weight:400;line-height:1.4",
+    body: "color:#24332C;font-size:16px;line-height:1.7;font-family:Helvetica Neue,Helvetica,Arial,sans-serif",
+    link: "#1B4D3E",
+    linkLine: "#C4A574",
+    signName: "margin:0;color:#1B4D3E;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:16px;font-weight:700",
+    signMeta: "margin:6px 0 0;color:#5C6B63;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:13px;line-height:1.55"
+  },
+  securafin: {
+    page: "#0E1418",
+    card: "#F4F7F8",
+    cardBorder: "#1F2A30",
+    masthead: "#0B1216",
+    wordmark: "SECURAFIN-AI",
+    wordmarkStyle: "margin:0;color:#E8F4F4;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:16px;font-weight:600;letter-spacing:.26em",
+    kicker: "Secure correspondence",
+    kickerStyle: "margin:10px 0 0;color:#7ED4C8;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:10px;letter-spacing:.28em;text-transform:uppercase",
+    rule: "#2EC4B6",
+    subjectStyle: "margin:0 0 24px;color:#0B1216;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:20px;font-weight:500;line-height:1.4",
+    body: "color:#1C262C;font-size:16px;line-height:1.7;font-family:Helvetica Neue,Helvetica,Arial,sans-serif",
+    link: "#0F6E67",
+    linkLine: "#2EC4B6",
+    signName: "margin:0;color:#0B1216;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:16px;font-weight:700",
+    signMeta: "margin:6px 0 0;color:#5A6A72;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:13px;line-height:1.55"
+  },
+  parable: {
+    page: "#2A1418",
+    card: "#F8F1E6",
+    cardBorder: "#4A2A30",
+    masthead: "#4A1520",
+    wordmark: "PARABLE",
+    wordmarkStyle: "margin:0;color:#F8F1E6;font-family:Didot,'Bodoni MT',Georgia,'Times New Roman',serif;font-size:30px;font-weight:400;letter-spacing:.34em",
+    kicker: "Studio correspondence",
+    kickerStyle: "margin:10px 0 0;color:#E3C6A0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:10px;letter-spacing:.32em;text-transform:uppercase",
+    rule: "#C4A574",
+    subjectStyle: "margin:0 0 28px;color:#4A1520;font-family:Didot,'Bodoni MT',Georgia,'Times New Roman',serif;font-size:22px;font-weight:400;line-height:1.35",
+    body: "color:#2A1A16;font-size:16px;line-height:1.75;font-family:Georgia,'Times New Roman',serif",
+    link: "#7A2433",
+    linkLine: "#C4A574",
+    signName: "margin:0;color:#4A1520;font-family:Didot,'Bodoni MT',Georgia,'Times New Roman',serif;font-size:18px",
+    signMeta: "margin:6px 0 0;color:#7A6458;font-family:Georgia,'Times New Roman',serif;font-size:13px;line-height:1.55"
+  },
+  mass: {
+    page: "#EDE8DF",
+    card: "#FFFFFF",
+    cardBorder: "#C8BFAE",
+    masthead: "#2C2A26",
+    wordmark: "MASS DEVELOPMENT GROUP",
+    wordmarkStyle: "margin:0;color:#F4EFE4;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:13px;font-weight:600;letter-spacing:.22em",
+    kicker: "Development correspondence",
+    kickerStyle: "margin:10px 0 0;color:#C4A574;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:10px;letter-spacing:.26em;text-transform:uppercase",
+    rule: "#8A7348",
+    subjectStyle: "margin:0 0 24px;color:#2C2A26;font-family:Georgia,'Times New Roman',serif;font-size:20px;font-weight:400;line-height:1.4",
+    body: "color:#2C2A26;font-size:16px;line-height:1.7;font-family:Helvetica Neue,Helvetica,Arial,sans-serif",
+    link: "#6B5728",
+    linkLine: "#8A7348",
+    signName: "margin:0;color:#2C2A26;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:16px;font-weight:700",
+    signMeta: "margin:6px 0 0;color:#6B655C;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:13px;line-height:1.55"
   }
 } as const;
+
+function signatureHtml(from: string, look: EmailLook) {
+  const theme = looks[look];
+  const company = emailLooks.find((item) => item.id === look)?.company;
+  const email = escapeHtml(from);
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:12px">
+  <tr>
+    <td style="padding-top:20px;border-top:1px solid ${theme.rule}">
+      <p style="${theme.signName}">${escapeHtml(ownerSignature.name)}</p>
+      ${company ? `<p style="${theme.signMeta}">${escapeHtml(company)}</p>` : ""}
+      <p style="${theme.signMeta}"><a href="mailto:${email}" style="color:${theme.link};text-decoration:none">${email}</a></p>
+      <p style="${theme.signMeta}">${escapeHtml(ownerSignature.phone)}</p>
+    </td>
+  </tr>
+</table>`;
+}
 
 export function formatMessageHtml(body: string, look: EmailLook = "personal") {
   const theme = looks[look];
@@ -94,8 +168,9 @@ export function buildProfessionalEmailHtml({
   body: string;
   look?: EmailLook;
 }) {
-  const theme = looks[look ?? defaultEmailLookForSender(from)];
-  const content = formatMessageHtml(body, look ?? defaultEmailLookForSender(from)) || `<p style="margin:0;${theme.body}">${escapeHtml(body)}</p>`;
+  const selected = look ?? defaultEmailLookForSender(from);
+  const theme = looks[selected];
+  const content = formatMessageHtml(body, selected) || `<p style="margin:0;${theme.body}">${escapeHtml(body)}</p>`;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -119,11 +194,7 @@ export function buildProfessionalEmailHtml({
           <td style="padding:36px 36px 8px">
             <p style="${theme.subjectStyle}">${escapeHtml(subject)}</p>
             ${content}
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:8px 36px 32px">
-            <p style="${theme.footerStyle}">Sent by ${escapeHtml(from)}</p>
+            ${signatureHtml(from, selected)}
           </td>
         </tr>
       </table>
@@ -132,4 +203,9 @@ export function buildProfessionalEmailHtml({
 </table>
 </body>
 </html>`;
+}
+
+export function emailLookChrome(look: EmailLook) {
+  const theme = looks[look];
+  return { page: theme.page, masthead: theme.masthead, accent: theme.rule };
 }

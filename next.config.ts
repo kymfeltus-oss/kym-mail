@@ -4,6 +4,9 @@ import path from "node:path";
 const nextConfig: NextConfig = {
   outputFileTracingRoot: path.resolve(process.cwd()),
   poweredByHeader: false,
+  experimental: {
+    middlewareClientMaxBodySize: "20mb"
+  },
   async headers() {
     return [{
       source: "/(.*)",
