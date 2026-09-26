@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { blockedAttachmentPattern } from "@/lib/mail/compose-validation";
 
 export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
@@ -30,8 +29,4 @@ export function selectForwardableAttachments<T extends { name: string; size: num
 
 export function validateAttachmentFiles(files: File[]) {
   return validateAttachmentEntries(files);
-}
-
-export function attachmentSha256(content: Uint8Array) {
-  return createHash("sha256").update(content).digest("hex");
 }
