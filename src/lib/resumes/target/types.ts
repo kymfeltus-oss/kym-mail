@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ResumeTargetIntelligence } from "@/lib/resumes/target/intelligence";
 
 export const targetRequirementCategorySchema = z.enum([
   "RESPONSIBILITY", "SKILL", "TECHNOLOGY", "SYSTEM", "ACCOUNTING", "FINANCE", "DATA",
@@ -105,6 +106,9 @@ export type TargetResumeView = {
   requirements: TargetRequirement[];
   confirmations: Array<{ requirementId: string; answer: "YES" | "NO"; promptText: string }>;
   currentVersion: { id: string; versionNumber: number; content: TargetResumeContent; createdAt: string } | null;
+  intelligenceStatus: "NOT_RUN" | "COMPLETE" | "FAILED";
+  intelligenceFailure: string | null;
+  intelligence: ResumeTargetIntelligence | null;
 };
 
 export type TargetResumeListItem = {

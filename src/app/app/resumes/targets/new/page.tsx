@@ -17,7 +17,7 @@ export default async function NewTargetedResumePage() {
         <header className="mt-5">
           <p className="text-xs font-semibold uppercase tracking-[.22em] text-[#8A6A32]">Targeted resume</p>
           <h1 className="mt-2 text-4xl font-semibold tracking-[-.05em] text-[#3E1D2C] sm:text-5xl">Drop in the job description.</h1>
-          <p className="mt-4 max-w-3xl text-sm leading-7 text-[#70626A]">This studio does not use Jobs or Career Match. It reads the brief against your Career Profile, then asks you about anything that does not already have evidence.</p>
+          <p className="mt-4 max-w-3xl text-sm leading-7 text-[#70626A]">This studio does not use Jobs or Career Match. It reads the brief against your Career Profile, identifies a hidden employer when the clues support it, then asks you about anything that does not already have evidence.</p>
         </header>
         <ResumeTargetIntake />
       </main>

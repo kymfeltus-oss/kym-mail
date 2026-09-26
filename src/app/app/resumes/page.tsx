@@ -32,7 +32,7 @@ export default async function ResumeHubPage() {
           <Link href="/app/resumes/targets/new" className="rounded-[2rem] border border-[#111111] bg-[#111111] p-6 text-[#F7F1E6] shadow-[0_18px_54px_rgba(17,17,17,.18)]">
             <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#C4A574]">Targeted version</p>
             <h2 className="mt-2 flex items-center gap-2 text-2xl font-semibold"><FilePlus2 className="size-6 text-[#C4A574]" /> New from job description</h2>
-            <p className="mt-3 text-sm leading-6 text-[#E8D9B8]">Paste a brief. Confirm unmatched experience. Get a version written for that role.</p>
+            <p className="mt-3 text-sm leading-6 text-[#E8D9B8]">Paste a brief. Identify a hidden employer when the clues support it. Confirm unmatched experience. Get a version written for that role.</p>
           </Link>
         </div>
         <section className="mt-10">

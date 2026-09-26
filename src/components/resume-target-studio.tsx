@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, CircleHelp, LoaderCircle, Sparkles, X } from "lucide-react";
 import { ExpressiveResume } from "@/components/expressive-resume";
+import { ResumeTargetIntelligencePanel } from "@/components/resume-target-intelligence";
 import { readApiJson } from "@/lib/http/read-api-json";
 import type { TargetResumeView } from "@/lib/resumes/target/types";
 
@@ -78,6 +79,7 @@ export function ResumeTargetStudio({ target }: { target: TargetResumeView }) {
     <div className="mt-8 space-y-8">
       {error && <p role="alert" className="rounded-2xl bg-[#FFF1F2] p-3 text-sm text-[#A73D52]">{error}</p>}
       {target.failureMessage && <p role="alert" className="rounded-2xl bg-[#FFF1F2] p-3 text-sm text-[#A73D52]">{target.failureMessage}</p>}
+      <ResumeTargetIntelligencePanel target={target} />
 
       <section className="rounded-[2rem] border border-[#E7DBD8] bg-[#FFFDFC] p-5 sm:p-7">
         <p className="text-xs font-semibold uppercase tracking-[.18em] text-[#8D2948]">Already on the page</p>

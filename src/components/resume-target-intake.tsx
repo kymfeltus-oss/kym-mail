@@ -54,7 +54,7 @@ export function ResumeTargetIntake() {
     <form onSubmit={submit} className="mt-8 rounded-[2rem] border border-[#E7DBD8] bg-[#FFFDFC] p-5 shadow-[0_24px_80px_rgba(73,24,42,.08)] sm:p-8">
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="text-sm font-semibold text-[#3E1D2C]">Role title<input required minLength={2} maxLength={300} value={title} onChange={(event) => setTitle(event.target.value)} className="mt-2 min-h-12 w-full rounded-2xl border border-[#E7DBD8] bg-white px-4 font-normal text-[#554850]" /></label>
-        <label className="text-sm font-semibold text-[#3E1D2C]">Company<input required minLength={2} maxLength={200} value={employer} onChange={(event) => setEmployer(event.target.value)} className="mt-2 min-h-12 w-full rounded-2xl border border-[#E7DBD8] bg-white px-4 font-normal text-[#554850]" /></label>
+        <label className="text-sm font-semibold text-[#3E1D2C]">Company<span className="mt-2 block font-normal text-xs text-[#70626A]">Use Confidential Client when the employer is hidden. The studio will try to identify it from the brief.</span><input required minLength={2} maxLength={200} value={employer} onChange={(event) => setEmployer(event.target.value)} className="mt-2 min-h-12 w-full rounded-2xl border border-[#E7DBD8] bg-white px-4 font-normal text-[#554850]" /></label>
       </div>
       <label
         onDragOver={(event) => { event.preventDefault(); setDragging(true); }}

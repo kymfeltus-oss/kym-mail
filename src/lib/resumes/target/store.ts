@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { loadCareerFacts } from "@/lib/resumes/career";
 import { analyzeResumeTarget, JobAnalysisInputError } from "@/lib/resumes/target/analyze";
 import { generateTargetResume, TargetResumeError } from "@/lib/resumes/target/generate";
+import { identifyResumeTargetIntelligence, resumeTargetIntelligenceSchema } from "@/lib/resumes/target/intelligence";
 import { targetConfirmationSchema, targetRequirementSchema, targetResumeContentSchema, type TargetConfirmationInput, type TargetRequirement, type TargetResumeListItem, type TargetResumeView } from "@/lib/resumes/target/types";
 import { validateTargetResume } from "@/lib/resumes/target/validate";
 
@@ -48,7 +49,7 @@ export async function listResumeTargets(database: SupabaseClient, ownerId: strin
 }
 
 export async function loadResumeTarget(database: SupabaseClient, ownerId: string, targetId: string): Promise<TargetResumeView | null> {
-  const { data: target, error } = await database.from("resume_targets").select("id, title, employer, job_description, status, failure_message, created_at, current_version_id").eq("owner_id", ownerId).eq("id", targetId).maybeSingle();
+  const { data: target, error } = await database.from("resume_targets").select("id, title, employer, job_description, status, failure_message, created_at, current_version_id, intelligence, intelligence_status, intelligence_failure").eq("owner_id", ownerId).eq("id", targetId).maybeSingle();
   if (error) throw new TargetResumeError("RESUME_TARGET_UNAVAILABLE", "This targeted resume could not be loaded.");
   if (!target) return null;
   const [{ data: requirementRows, error: requirementError }, { data: confirmationRows, error: confirmationError }, { data: version, error: versionError }] = await Promise.all([
@@ -69,7 +70,12 @@ export async function loadResumeTarget(database: SupabaseClient, ownerId: string
     createdAt: target.created_at,
     requirements: ((requirementRows ?? []) as RequirementRow[]).map(mapRequirement),
     confirmations: (confirmationRows ?? []).map((row) => ({ requirementId: row.requirement_id, answer: row.answer, promptText: row.prompt_text })),
-    currentVersion: version ? { id: version.id, versionNumber: version.version_number, content: targetResumeContentSchema.parse(version.content), createdAt: version.created_at } : null
+    currentVersion: version ? { id: version.id, versionNumber: version.version_number, content: targetResumeContentSchema.parse(version.content), createdAt: version.created_at } : null,
+    intelligenceStatus: (target.intelligence_status as TargetResumeView["intelligenceStatus"] | null) ?? "NOT_RUN",
+    intelligenceFailure: target.intelligence_failure ?? null,
+    intelligence: target.intelligence && Object.keys(target.intelligence as object).length
+      ? resumeTargetIntelligenceSchema.parse(target.intelligence)
+      : null
   };
 }
 
@@ -158,6 +164,28 @@ export async function generateResumeTargetVersion(database: SupabaseClient, owne
     if (mapped.code !== "CONFIRMATIONS_REQUIRED") {
       await database.from("resume_targets").update({ status: "FAILED", failure_message: mapped.message.slice(0, 500) }).eq("id", targetId).eq("owner_id", ownerId);
     }
+    throw mapped;
+  }
+}
+
+export async function identifyResumeTargetCompany(database: SupabaseClient, ownerId: string, targetId: string) {
+  const target = await loadResumeTarget(database, ownerId, targetId);
+  if (!target) throw new TargetResumeError("RESUME_TARGET_NOT_FOUND", "This targeted resume was not found.");
+  try {
+    const intelligence = await identifyResumeTargetIntelligence({ title: target.title, employer: target.employer, description: target.jobDescription });
+    const { error } = await database.from("resume_targets").update({
+      intelligence,
+      intelligence_status: "COMPLETE",
+      intelligence_failure: null
+    }).eq("id", targetId).eq("owner_id", ownerId);
+    if (error) throw new TargetResumeError("RESUME_TARGET_INTELLIGENCE_FAILED", "The hidden-employer analysis could not be saved.");
+    return intelligence;
+  } catch (error) {
+    const mapped = error instanceof TargetResumeError ? error : new TargetResumeError("RESUME_TARGET_INTELLIGENCE_FAILED", "The hidden-employer analysis could not be completed.");
+    await database.from("resume_targets").update({
+      intelligence_status: "FAILED",
+      intelligence_failure: mapped.message.slice(0, 500)
+    }).eq("id", targetId).eq("owner_id", ownerId);
     throw mapped;
   }
 }
