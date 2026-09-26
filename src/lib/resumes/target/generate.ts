@@ -104,7 +104,7 @@ export function generateTargetResume(input: {
   ].slice(0, 24);
   const skillGroups = [...new Set(orderedSkills.map((skill) => skill.category))].map((category) => ({
     category,
-    skills: orderedSkills.filter((skill) => skill.category === category).map((skill) => ({ skillId: skill.id, name: skill.name }))
+    skills: orderedSkills.filter((skill) => skill.category === category).slice(0, 24).map((skill) => ({ skillId: skill.id, name: skill.name }))
   })).filter((group) => group.skills.length);
 
   const matchedHighlights = matched.slice(0, 4).flatMap((requirement) => {
@@ -132,7 +132,7 @@ export function generateTargetResume(input: {
     education: career.education.map((item) => ({
       educationId: item.id,
       degree: item.degree,
-      fieldOfStudy: item.fieldOfStudy,
+      fieldOfStudy: item.fieldOfStudy && item.fieldOfStudy.trim().length >= 2 ? item.fieldOfStudy : null,
       institution: item.institution,
       completedOn: item.completedOn
     })),
@@ -141,12 +141,18 @@ export function generateTargetResume(input: {
       name: item.name,
       status: item.status
     })),
-    confirmedCapabilities: confirmed.map((item) => ({
+    confirmedCapabilities: confirmed.slice(0, 80).map((item) => ({
       requirementId: item.requirement.id,
-      requirement: item.requirement.originalText,
-      statement: item.statement
+      requirement: item.requirement.originalText.slice(0, 2000),
+      statement: item.statement.slice(0, 2000)
     }))
   };
 
-  return targetResumeContentSchema.parse(content);
+  const parsed = targetResumeContentSchema.safeParse(content);
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const path = issue?.path.length ? issue.path.join(".") : "content";
+    throw new TargetResumeError("RESUME_TARGET_INVALID", `The targeted resume could not be written because ${path} is invalid.`);
+  }
+  return parsed.data;
 }

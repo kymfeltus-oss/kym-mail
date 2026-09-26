@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
 import { loadCareerFacts } from "@/lib/resumes/career";
 import { analyzeResumeTarget, JobAnalysisInputError } from "@/lib/resumes/target/analyze";
 import { generateTargetResume, TargetResumeError } from "@/lib/resumes/target/generate";
@@ -34,6 +35,11 @@ function mapRequirement(row: RequirementRow): TargetRequirement {
 
 function mapError(error: unknown) {
   if (error instanceof TargetResumeError) return error;
+  if (error instanceof z.ZodError) {
+    const issue = error.issues[0];
+    const path = issue?.path.length ? issue.path.join(".") : "content";
+    return new TargetResumeError("RESUME_TARGET_INVALID", `The targeted resume could not be written because ${path} is invalid.`);
+  }
   if (error instanceof JobAnalysisInputError) {
     if (error.code === "JOB_DESCRIPTION_MISSING") return new TargetResumeError("JOB_DESCRIPTION_MISSING", "Paste a complete job description to create this resume.");
     if (error.code === "JOB_DESCRIPTION_INCOMPLETE") return new TargetResumeError("JOB_DESCRIPTION_INCOMPLETE", "This job description does not contain enough requirements to tailor a resume.");

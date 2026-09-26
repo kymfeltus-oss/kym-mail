@@ -91,6 +91,35 @@ describe("targeted resume generation", () => {
     expect(content.experiences[0]?.employer).toBe("Mass Development Group");
   });
 
+  it("writes a targeted resume when more than 20 requirements are confirmed", () => {
+    const analysis = analyzeResumeTarget({ title: "Director of Accounting", employer: "Example Capital", description }, career());
+    const extras: TargetRequirement[] = Array.from({ length: 23 }, (_, index) => ({
+      id: `21111111-1111-4111-8111-${String(index + 1).padStart(12, "0")}`,
+      sequenceNumber: 100 + index,
+      originalText: `Unverified capability ${index + 1} for finance operations.`,
+      category: "FINANCE",
+      importance: "PREFERRED",
+      matchState: "UNVERIFIED",
+      explanation: "No Career Profile evidence was found for this requirement.",
+      matchedEvidence: [],
+      needsConfirmation: true
+    }));
+    const requirements = [
+      ...analysis.requirements.map((item, index) => ({
+        ...item,
+        id: `11111111-1111-4111-8111-${String(index + 1).padStart(12, "0")}`
+      })),
+      ...extras
+    ] as TargetRequirement[];
+    const confirmations = requirements.filter((item) => item.needsConfirmation).map((item) => ({
+      requirementId: item.id,
+      answer: "YES" as const,
+      promptText: `I have this experience from finance transformation work, including capability ${item.originalText.slice(-12)}.`
+    }));
+    const content = generateTargetResume({ career: career(), title: "Director of Accounting", employer: "Example Capital", requirements, confirmations });
+    expect(content.confirmedCapabilities.length).toBeGreaterThan(20);
+  });
+
   it("does not write a resume until unmatched requirements are confirmed", () => {
     const analysis = analyzeResumeTarget({ title: "Director of Accounting", employer: "Example Capital", description }, career());
     const requirements = analysis.requirements.map((item, index) => ({

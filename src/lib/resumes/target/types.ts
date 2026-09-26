@@ -73,7 +73,7 @@ export const targetResumeContentSchema = z.object({
   })).max(6),
   skillGroups: z.array(z.object({
     category: z.enum(["FINANCE", "ACCOUNTING", "TECHNOLOGY", "SYSTEM", "DATA", "LEADERSHIP", "INDUSTRY"]),
-    skills: z.array(z.object({ skillId: z.string().uuid(), name: z.string().trim().min(1).max(160) })).min(1).max(20)
+    skills: z.array(z.object({ skillId: z.string().uuid(), name: z.string().trim().min(1).max(160) })).min(1).max(24)
   })).max(10),
   education: z.array(z.object({
     educationId: z.string().uuid(),
@@ -91,7 +91,7 @@ export const targetResumeContentSchema = z.object({
     requirementId: z.string().uuid(),
     requirement: z.string().trim().min(3).max(2000),
     statement: z.string().trim().min(20).max(2000)
-  })).max(20)
+  })).max(80)
 });
 export type TargetResumeContent = z.infer<typeof targetResumeContentSchema>;
 

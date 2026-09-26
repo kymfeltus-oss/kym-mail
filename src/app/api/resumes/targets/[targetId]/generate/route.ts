@@ -20,7 +20,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json(result);
   } catch (error) {
     const mapped = error instanceof TargetResumeError ? error : new TargetResumeError("RESUME_TARGET_GENERATE_FAILED", "The targeted resume could not be written.");
-    const status = mapped.code === "RESUME_TARGET_NOT_FOUND" ? 404 : mapped.code === "CONFIRMATIONS_REQUIRED" || mapped.code === "CAREER_PROFILE_INCOMPLETE" ? 409 : mapped.code === "RESUME_FACT_VALIDATION_FAILED" ? 422 : 500;
+    const status = mapped.code === "RESUME_TARGET_NOT_FOUND" ? 404 : mapped.code === "CONFIRMATIONS_REQUIRED" || mapped.code === "CAREER_PROFILE_INCOMPLETE" ? 409 : mapped.code === "RESUME_FACT_VALIDATION_FAILED" || mapped.code === "RESUME_TARGET_INVALID" ? 422 : 500;
     return NextResponse.json({ error: mapped.message }, { status });
   }
 }
