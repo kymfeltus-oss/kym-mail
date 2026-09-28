@@ -48,6 +48,11 @@ describe("consultation security and provider contract", () => {
     expect(readFileSync("src/app/page.tsx", "utf8")).toContain('redirect(owner?.user.email ? "/app" : "/consult")');
     expect(existsSync("src/app/consult/page.tsx")).toBe(true);
     expect(existsSync("src/app/consult/book/[token]/page.tsx")).toBe(true);
+    const consultPage = readFileSync("src/app/consult/page.tsx", "utf8");
+    expect(consultPage).toContain("No account is required");
+    expect(consultPage).not.toContain("/client/register");
+    expect(consultPage).not.toContain("/client/sign-in");
+    expect(existsSync("src/app/api/consultations/sessions/route.ts")).toBe(true);
 
     const raw = JSON.stringify({ triggerEvent: "BOOKING_CREATED", createdAt: new Date().toISOString(), payload: { uid: "cal-booking-1", eventTypeId: 42, eventTitle: "Advisory Consultation", startTime: "2026-09-02T15:00:00.000Z", endTime: "2026-09-02T15:45:00.000Z", metadata: { consultationRequestId: id }, attendees: [{ name: "Test Client", email: "TEST@example.com", timeZone: "America/Chicago" }] } });
     const secret = "test-secret-that-is-at-least-thirty-two-characters";

@@ -37,6 +37,6 @@ export function ConsultationForm() {
     </div>
     {error && <p role="alert" className="mt-5 rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
     <button disabled={busy} className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#D95B72] px-5 py-3.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(217,91,114,.22)] disabled:opacity-60">{busy ? <><LoaderCircle className="size-4 animate-spin" /> Submitting securely…</> : <><ShieldCheck className="size-4" /> Submit for owner review</>}</button>
-    <p className="mt-4 text-center text-xs leading-5 text-[#7A8795]">Submitting proof does not confirm payment or release scheduling access.</p>
+    <p className="mt-4 text-center text-xs leading-5 text-[#7A8795]">No account is required. Submitting proof does not confirm payment or release scheduling access.</p>
   </form>;
 }

@@ -1,12 +1,10 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlertTriangle, ArrowRight, BriefcaseBusiness, CalendarCheck2, CalendarClock, FileCheck2, FolderKanban, Inbox, MailCheck, Plus, SquarePen } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { GmailConnectionPanel } from "@/components/gmail-connection-panel";
+import { AdminDashboard, type PendingProof, type UpcomingClientSession, type UpcomingConsultation } from "@/components/dashboard/admin-dashboard";
+import { DashboardViewSwitch } from "@/components/dashboard/view-switch";
+import { UserBookingView, type PublicBookingSettings } from "@/components/dashboard/user-booking-view";
 import { getOwnerContext } from "@/lib/auth/owner-context";
 import { googleMailOauthMessage } from "@/lib/mail/connection-status";
-import { formatMailTimestamp } from "@/lib/mail/date-format";
-import { projectStatusLabels, projectTypeLabels, type ProjectStatus, type ProjectType } from "@/lib/projects/validation";
 
 export const metadata = { title: "Dashboard" };
 
@@ -18,12 +16,13 @@ const activityLabels: Record<string, string> = {
   REPLY_RECEIVED: "Reply received"
 };
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ mailError?: string; mailConnected?: string }> }) {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ view?: string; mailError?: string; mailConnected?: string }> }) {
   const owner = await getOwnerContext();
   if (!owner?.user.email) redirect("/sign-in");
   const { database, user } = owner;
   const now = new Date().toISOString();
   const query = await searchParams;
+  const view = query.view === "user" ? "user" : "admin";
   const [
     { count: unreadCount, error: unreadError },
     { count: activeProjectCount, error: projectCountError },
@@ -35,9 +34,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     { data: nextScheduled, error: nextScheduledError },
     { count: savedJobsCount, error: savedJobsCountError },
     { data: recentJobs, error: recentJobsError },
-    { count: pendingConsultations, error: pendingConsultationsError },
-    { count: upcomingConsultations, error: upcomingConsultationsError },
-    { data: nextConsultation, error: nextConsultationError },
+    { data: pendingProofs, error: pendingConsultationsError },
+    { count: releasedCount, error: releasedError },
+    { data: upcomingConsultations, error: upcomingConsultationsError },
+    { data: sessionRows, error: sessionError },
+    { count: activeClients, error: clientsError },
+    { data: settings, error: settingsError },
     { data: connection, error: connectionError }
   ] = await Promise.all([
     database.from("mail_threads").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("is_unread", true),
@@ -50,65 +52,84 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     database.from("scheduled_messages").select("id, subject, scheduled_for, timezone").eq("owner_id", user.id).eq("status", "SCHEDULED").order("scheduled_for").limit(1).maybeSingle(),
     database.from("job_opportunities").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("status", "SAVED"),
     database.from("job_opportunities").select("id, title, company_name, location_text, saved_at").eq("owner_id", user.id).eq("status", "SAVED").order("saved_at", { ascending: false }).limit(3),
-    database.from("consultation_requests").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("payment_status", "PAYMENT_SUBMITTED"),
-    database.from("consultation_requests").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("payment_status", "BOOKED").gte("booking_start_at", now),
-    database.from("consultation_requests").select("client_name, booking_start_at").eq("owner_id", user.id).eq("payment_status", "BOOKED").gte("booking_start_at", now).order("booking_start_at").limit(1).maybeSingle(),
+    database.from("consultation_requests").select("id, client_name, client_email, consultation_type, expected_amount_cents, created_at").eq("owner_id", user.id).eq("payment_status", "PAYMENT_SUBMITTED").order("created_at", { ascending: false }).limit(5),
+    database.from("consultation_requests").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("payment_status", "BOOKING_RELEASED"),
+    database.from("consultation_requests").select("id, client_name, consultation_type, booking_start_at, booking_timezone").eq("owner_id", user.id).eq("payment_status", "BOOKED").gte("booking_start_at", now).order("booking_start_at").limit(5),
+    database.from("client_session_bookings").select("id, client_id, guest_name, booking_title, booking_start_at").eq("owner_id", user.id).eq("status", "BOOKED").gte("booking_start_at", now).order("booking_start_at").limit(5),
+    database.from("clients").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("is_active", true),
+    database.from("consultation_settings").select("is_active, client_sessions_active, client_session_booking_url, zelle_recipient_name, zelle_contact, payment_instructions, reference_instructions").eq("owner_id", user.id).maybeSingle(),
     database.from("mail_connections").select("provider_account_id, connection_state, initial_sync_completed_at, last_synced_at, sync_error").eq("owner_id", user.id).eq("provider", "google").maybeSingle()
   ]);
-  if (unreadError || projectCountError || projectsError || threadsError || identitiesError || activityError || scheduledCountError || nextScheduledError || savedJobsCountError || recentJobsError || pendingConsultationsError || upcomingConsultationsError || nextConsultationError || connectionError) throw new Error("DASHBOARD_UNAVAILABLE");
+  if (unreadError || projectCountError || projectsError || threadsError || identitiesError || activityError || scheduledCountError || nextScheduledError || savedJobsCountError || recentJobsError || pendingConsultationsError || releasedError || upcomingConsultationsError || sessionError || clientsError || settingsError || connectionError) throw new Error("DASHBOARD_UNAVAILABLE");
 
   const activityProjectIds = [...new Set((activity ?? []).map((item) => item.project_id))];
-  const { data: activityProjects, error: activityProjectsError } = activityProjectIds.length
-    ? await database.from("projects").select("id, name").eq("owner_id", user.id).in("id", activityProjectIds)
-    : { data: [], error: null };
-  if (activityProjectsError) throw new Error("DASHBOARD_UNAVAILABLE");
+  const sessionClientIds = [...new Set((sessionRows ?? []).flatMap((item) => item.client_id ? [item.client_id] : []))];
+  const [{ data: activityProjects, error: activityProjectsError }, { data: sessionClients, error: sessionClientsError }, { data: resumeVersions, error: resumeError }] = await Promise.all([
+    activityProjectIds.length
+      ? database.from("projects").select("id, name").eq("owner_id", user.id).in("id", activityProjectIds)
+      : Promise.resolve({ data: [], error: null }),
+    sessionClientIds.length
+      ? database.from("clients").select("id, full_name").eq("owner_id", user.id).in("id", sessionClientIds)
+      : Promise.resolve({ data: [], error: null }),
+    database.from("tailored_resume_versions").select("status, approved_at").eq("owner_id", user.id).in("status", ["REVIEW", "APPROVED", "STALE"])
+  ]);
+  if (activityProjectsError || sessionClientsError || resumeError) throw new Error("DASHBOARD_UNAVAILABLE");
+
   const projectNames = new Map((activityProjects ?? []).map((project) => [project.id, project.name]));
+  const clientNames = new Map((sessionClients ?? []).map((client) => [client.id, client.full_name]));
   const usableIdentities = (identities ?? []).filter((identity) => identity.is_active && identity.send_as_state === "available");
-  const { data: resumeVersions, error: resumeError } = await database.from("tailored_resume_versions").select("status, approved_at").eq("owner_id", user.id).in("status", ["REVIEW", "APPROVED", "STALE"]);
-  if (resumeError) throw new Error("DASHBOARD_UNAVAILABLE");
   const resumeNeedsReview = (resumeVersions ?? []).filter((version) => version.status === "REVIEW").length;
   const approvedResumes = (resumeVersions ?? []).filter((version) => Boolean(version.approved_at)).length;
   const staleResumes = (resumeVersions ?? []).filter((version) => version.status === "STALE").length;
+  const bookingSettings = settings as PublicBookingSettings | null;
+  const upcomingSessions: UpcomingClientSession[] = (sessionRows ?? []).map((item) => ({
+    id: item.id,
+    client_id: item.client_id,
+    client_name: item.guest_name ?? (item.client_id ? clientNames.get(item.client_id) ?? "Client" : "Guest"),
+    booking_title: item.booking_title,
+    booking_start_at: item.booking_start_at
+  }));
+  const todayLabel = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: "America/Chicago" }).format(new Date());
 
-  return <AppShell email={owner.user.email} canSignOut={owner.mode === "authenticated"} active="dashboard">
-    <div className="mx-auto max-w-6xl">
-      <header className="flex flex-wrap items-end justify-between gap-5">
-        <div><p className="text-xs font-semibold uppercase tracking-[.22em] text-[#D95B72]">KYM Mail workspace</p><h1 className="mt-2 text-3xl font-semibold tracking-[-.035em] text-[#183A5A] sm:text-5xl">Your work, in context.</h1><p className="mt-3 max-w-2xl text-sm leading-6 text-[#64748B]">Move between real mail activity and the Projects guiding your outreach.</p></div>
-        <div className="flex flex-wrap gap-3"><Link href="/app/projects/new" className="inline-flex items-center gap-2 rounded-full border border-[#E7B8C1] bg-[#FFF3F4] px-5 py-3 text-sm font-semibold text-[#A73D52]"><Plus className="size-4" /> New Project</Link><Link href="/app/compose" className="inline-flex items-center gap-2 rounded-full bg-[#D95B72] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(217,91,114,.22)]"><SquarePen className="size-4" /> Compose</Link></div>
-      </header>
-
-      <GmailConnectionPanel connection={connection ?? null} availableIdentityCount={usableIdentities.length} oauthMessage={googleMailOauthMessage(query.mailError, query.mailConnected === "true")} />
-
-      <section aria-label="Workspace summary" className="mt-9 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <Link href="/app/inbox" className="rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-6 shadow-[0_14px_42px_rgba(24,58,90,.06)] transition hover:-translate-y-0.5"><span className="grid size-10 place-items-center rounded-2xl bg-[#FFF3F4] text-[#D95B72]"><Inbox className="size-5" /></span><p className="mt-5 text-3xl font-semibold tracking-[-.04em] text-[#183A5A]">{unreadCount ?? 0}</p><p className="mt-1 text-sm text-[#64748B]">Unread thread{unreadCount === 1 ? "" : "s"}</p></Link>
-        <Link href="/app/projects" className="rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-6 shadow-[0_14px_42px_rgba(24,58,90,.06)] transition hover:-translate-y-0.5"><span className="grid size-10 place-items-center rounded-2xl bg-[#FFF3F4] text-[#D95B72]"><FolderKanban className="size-5" /></span><p className="mt-5 text-3xl font-semibold tracking-[-.04em] text-[#183A5A]">{activeProjectCount ?? 0}</p><p className="mt-1 text-sm text-[#64748B]">Active Project{activeProjectCount === 1 ? "" : "s"}</p></Link>
-        <div className="rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-6 shadow-[0_14px_42px_rgba(24,58,90,.06)]"><span className="grid size-10 place-items-center rounded-2xl bg-[#FFF3F4] text-[#D95B72]"><MailCheck className="size-5" /></span><p className="mt-5 text-3xl font-semibold tracking-[-.04em] text-[#183A5A]">{usableIdentities.length}</p><p className="mt-1 text-sm text-[#64748B]">Verified sender{usableIdentities.length === 1 ? "" : "s"}</p></div>
-        <Link href="/app/scheduled" className="rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-6 shadow-[0_14px_42px_rgba(24,58,90,.06)] transition hover:-translate-y-0.5"><span className="grid size-10 place-items-center rounded-2xl bg-[#FFF3F4] text-[#D95B72]"><CalendarClock className="size-5" /></span><p className="mt-5 text-3xl font-semibold tracking-[-.04em] text-[#183A5A]">{scheduledCount ?? 0}</p><p className="mt-1 text-sm text-[#64748B]">Scheduled email{scheduledCount === 1 ? "" : "s"}</p>{nextScheduled && <p className="mt-3 truncate text-xs text-[#A73D52]">Next: {nextScheduled.subject}</p>}</Link>
-        <Link href="/app/jobs/saved" className="rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-6 shadow-[0_14px_42px_rgba(24,58,90,.06)] transition hover:-translate-y-0.5"><span className="grid size-10 place-items-center rounded-2xl bg-[#FFF3F4] text-[#D95B72]"><BriefcaseBusiness className="size-5" /></span><p className="mt-5 text-3xl font-semibold tracking-[-.04em] text-[#183A5A]">{savedJobsCount ?? 0}</p><p className="mt-1 text-sm text-[#64748B]">Saved job{savedJobsCount === 1 ? "" : "s"}</p></Link>
-      </section>
-
-      <section aria-label="Consultation status" className="mt-5 grid gap-3 sm:grid-cols-3"><Link href="/app/calendar" className="flex items-center gap-4 rounded-2xl border border-[#E7DBD8] bg-[#FFFDFC] p-4"><span className="grid size-10 place-items-center rounded-xl bg-amber-50 text-amber-700"><AlertTriangle className="size-5" /></span><span><strong className="block text-xl text-[#3E1D2C]">{pendingConsultations ?? 0}</strong><span className="text-xs text-[#70626A]">Pending payment review{pendingConsultations === 1 ? "" : "s"}</span></span></Link><Link href="/app/calendar" className="flex items-center gap-4 rounded-2xl border border-[#E7DBD8] bg-[#FFFDFC] p-4"><span className="grid size-10 place-items-center rounded-xl bg-emerald-50 text-emerald-700"><CalendarCheck2 className="size-5" /></span><span><strong className="block text-xl text-[#3E1D2C]">{upcomingConsultations ?? 0}</strong><span className="text-xs text-[#70626A]">Upcoming consultation{upcomingConsultations === 1 ? "" : "s"}</span></span></Link><Link href="/app/calendar" className="flex min-w-0 items-center gap-4 rounded-2xl border border-[#E7DBD8] bg-[#FFFDFC] p-4"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#FFF0F1] text-[#A73D52]"><CalendarClock className="size-5" /></span><span className="min-w-0"><strong className="block truncate text-sm text-[#3E1D2C]">{nextConsultation?.client_name ?? "No next meeting"}</strong><span className="mt-1 block truncate text-xs text-[#70626A]">{nextConsultation?.booking_start_at ? formatMailTimestamp(nextConsultation.booking_start_at) : "Calendar is clear"}</span></span></Link></section>
-
-      <section aria-label="Resume status" className="mt-5 grid gap-3 sm:grid-cols-3"><Link href="/app/jobs/saved" className="flex items-center gap-4 rounded-2xl border border-[#E7DBD8] bg-[#FFFDFC] p-4"><span className="grid size-10 place-items-center rounded-xl bg-[#F7F1F2] text-[#8D2948]"><FileCheck2 className="size-5" /></span><span><strong className="block text-xl text-[#3E1D2C]">{resumeNeedsReview}</strong><span className="text-xs text-[#70626A]">Resume version{resumeNeedsReview === 1 ? "" : "s"} needing review</span></span></Link><Link href="/app/jobs/saved" className="flex items-center gap-4 rounded-2xl border border-[#E7DBD8] bg-[#FFFDFC] p-4"><span className="grid size-10 place-items-center rounded-xl bg-[#E8F7EF] text-[#176B4C]"><FileCheck2 className="size-5" /></span><span><strong className="block text-xl text-[#3E1D2C]">{approvedResumes}</strong><span className="text-xs text-[#70626A]">Approved snapshot{approvedResumes === 1 ? "" : "s"}</span></span></Link><Link href="/app/jobs/saved" className="flex items-center gap-4 rounded-2xl border border-[#E7DBD8] bg-[#FFFDFC] p-4"><span className="grid size-10 place-items-center rounded-xl bg-[#FFF0F1] text-[#A73D52]"><AlertTriangle className="size-5" /></span><span><strong className="block text-xl text-[#3E1D2C]">{staleResumes}</strong><span className="text-xs text-[#70626A]">Stale resume{staleResumes === 1 ? "" : "s"}</span></span></Link></section>
-
-      <div className="mt-8 grid min-w-0 gap-8 xl:grid-cols-[1.15fr_.85fr]">
-        <section className="min-w-0 rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-5 shadow-[0_14px_42px_rgba(24,58,90,.06)] sm:p-7">
-          <div className="flex items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-[.18em] text-[#D95B72]">Mail</p><h2 className="mt-1 text-xl font-semibold text-[#183A5A]">Recent conversations</h2></div><Link href="/app/inbox" className="text-sm font-semibold text-[#A73D52]">View Inbox</Link></div>
-          {threads?.length ? <div className="mt-5 divide-y divide-[#E8E2E3]">{threads.map((thread) => <Link key={thread.id} href={`/app/thread/${thread.id}`} className="flex items-start gap-3 py-4 first:pt-0 last:pb-0"><span className={`mt-2 size-2 shrink-0 rounded-full ${thread.is_unread ? "bg-[#D95B72]" : "bg-[#D7D2D3]"}`} /><span className="min-w-0 flex-1"><span className="flex flex-wrap justify-between gap-2"><strong className="truncate text-sm text-[#183A5A]">{thread.subject}</strong><time className="text-xs text-[#64748B]">{formatMailTimestamp(thread.last_message_at)}</time></span><span className="mt-1 block truncate text-sm text-[#64748B]">{thread.snippet || "No preview available."}</span></span></Link>)}</div> : <div className="mt-6 rounded-2xl bg-[#FFF3F4] p-5"><p className="text-sm font-semibold text-[#183A5A]">No mail activity yet</p><p className="mt-1 text-sm leading-6 text-[#64748B]">Synchronized conversations will appear here.</p></div>}
-        </section>
-
-        <section className="min-w-0 rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-5 shadow-[0_14px_42px_rgba(24,58,90,.06)] sm:p-7">
-          <div className="flex items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-[.18em] text-[#D95B72]">Context</p><h2 className="mt-1 text-xl font-semibold text-[#183A5A]">Projects</h2></div><Link href="/app/projects" className="text-sm font-semibold text-[#A73D52]">View all</Link></div>
-          {projects?.length ? <div className="mt-5 space-y-3">{projects.map((project) => <Link key={project.id} href={`/app/projects/${project.id}`} className="block rounded-2xl border border-[#E8E2E3] p-4 transition hover:border-[#E7B8C1] hover:bg-[#FFF3F4]"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="truncate text-sm font-semibold text-[#183A5A]">{project.name}</h3><p className="mt-1 text-xs text-[#64748B]">{projectTypeLabels[project.type as ProjectType]}</p></div><span className="rounded-full bg-[#F7DDE1] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[.08em] text-[#A73D52]">{projectStatusLabels[project.status as ProjectStatus]}</span></div></Link>)}</div> : <div className="mt-6 rounded-2xl bg-[#FFF3F4] p-5"><p className="text-sm font-semibold text-[#183A5A]">No Projects yet</p><p className="mt-1 text-sm leading-6 text-[#64748B]">Create a Project when outreach needs shared context.</p><Link href="/app/projects/new" className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[#A73D52]">Create Project <ArrowRight className="size-4" /></Link></div>}
-        </section>
+  return (
+    <AppShell email={owner.user.email} canSignOut={owner.mode === "authenticated"} active="dashboard">
+      <div className="mx-auto max-w-6xl">
+        <DashboardViewSwitch view={view} mailError={query.mailError} mailConnected={query.mailConnected} />
+        <div className="mt-8">
+          {view === "user" ? <UserBookingView settings={bookingSettings} /> : (
+            <AdminDashboard
+              todayLabel={todayLabel}
+              oauthMessage={googleMailOauthMessage(query.mailError, query.mailConnected === "true")}
+              connection={connection ?? null}
+              usableIdentityCount={usableIdentities.length}
+              unreadCount={unreadCount ?? 0}
+              activeProjectCount={activeProjectCount ?? 0}
+              scheduledCount={scheduledCount ?? 0}
+              nextScheduledSubject={nextScheduled?.subject ?? null}
+              savedJobsCount={savedJobsCount ?? 0}
+              pendingProofs={(pendingProofs ?? []) as PendingProof[]}
+              releasedCount={releasedCount ?? 0}
+              upcomingConsultations={(upcomingConsultations ?? []) as UpcomingConsultation[]}
+              upcomingSessions={upcomingSessions}
+              intakeOpen={Boolean(bookingSettings?.is_active)}
+              sessionsOpen={Boolean(bookingSettings?.client_sessions_active && bookingSettings.client_session_booking_url)}
+              activeClients={activeClients ?? 0}
+              resumeNeedsReview={resumeNeedsReview}
+              approvedResumes={approvedResumes}
+              staleResumes={staleResumes}
+              threads={threads ?? []}
+              projects={projects ?? []}
+              recentJobs={recentJobs ?? []}
+              activity={(activity ?? []).map((item) => ({
+                id: item.id,
+                label: activityLabels[item.activity_type] ?? "Project activity",
+                projectName: projectNames.get(item.project_id) ?? "Project",
+                occurred_at: item.occurred_at
+              }))}
+            />
+          )}
+        </div>
       </div>
-
-      <section className="mt-8 rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-5 shadow-[0_14px_42px_rgba(24,58,90,.06)] sm:p-7"><div className="flex items-center justify-between gap-4"><div><p className="text-xs font-semibold uppercase tracking-[.18em] text-[#D95B72]">Opportunities</p><h2 className="mt-1 text-xl font-semibold text-[#183A5A]">Recently saved jobs</h2></div><Link href="/app/jobs" className="text-sm font-semibold text-[#A73D52]">Search Jobs</Link></div>{recentJobs?.length ? <div className="mt-5 grid gap-3 md:grid-cols-3">{recentJobs.map((job) => <Link key={job.id} href={`/app/jobs/saved/${job.id}`} className="min-w-0 rounded-2xl border border-[#E8E2E3] p-4 transition hover:border-[#E7B8C1] hover:bg-[#FFF3F4]"><p className="break-words text-sm font-semibold text-[#183A5A]">{job.title}</p><p className="mt-1 truncate text-xs text-[#64748B]">{job.company_name}{job.location_text ? ` · ${job.location_text}` : ""}</p></Link>)}</div> : <div className="mt-5 rounded-2xl bg-[#FFF3F4] p-5"><p className="text-sm font-semibold text-[#183A5A]">No saved opportunities yet</p><p className="mt-1 text-sm leading-6 text-[#64748B]">Real jobs you save will appear here.</p></div>}</section>
-
-      <section className="mt-8 rounded-3xl border border-[#E8E2E3] bg-[#FFFCFB] p-5 shadow-[0_14px_42px_rgba(24,58,90,.06)] sm:p-7">
-        <p className="text-xs font-semibold uppercase tracking-[.18em] text-[#D95B72]">Project activity</p><h2 className="mt-1 text-xl font-semibold text-[#183A5A]">Recent context changes</h2>
-        {activity?.length ? <ol className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{activity.map((item) => <li key={item.id} className="rounded-2xl border border-[#E8E2E3] p-4"><p className="text-sm font-semibold text-[#183A5A]">{activityLabels[item.activity_type] ?? "Project activity"}</p><p className="mt-1 truncate text-xs text-[#64748B]">{projectNames.get(item.project_id) ?? "Project"}</p><time className="mt-3 block text-[11px] text-[#94A3B8]">{formatMailTimestamp(item.occurred_at)}</time></li>)}</ol> : <p className="mt-5 text-sm leading-6 text-[#64748B]">Real Project changes and Project-linked mail activity will appear here.</p>}
-      </section>
-    </div>
-  </AppShell>;
+    </AppShell>
+  );
 }

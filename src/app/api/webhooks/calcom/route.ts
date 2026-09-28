@@ -20,9 +20,10 @@ export async function POST(request: Request) {
   try {
     const event = parseCalWebhook(rawBody);
     if (event.clientSessionBookingId && !event.requestId) {
-      const { data: sessionBooking } = await database.from("client_session_bookings").select("id, owner_id, client_id, status, provider_booking_id").eq("id", event.clientSessionBookingId).maybeSingle();
-      const { data: client } = sessionBooking ? await database.from("clients").select("email").eq("id", sessionBooking.client_id).maybeSingle() : { data: null };
-      if (!sessionBooking || !client || event.attendeeEmail !== client.email) return NextResponse.json({ error: "Client session booking does not match." }, { status: 404 });
+      const { data: sessionBooking } = await database.from("client_session_bookings").select("id, owner_id, client_id, guest_email, status, provider_booking_id").eq("id", event.clientSessionBookingId).maybeSingle();
+      const { data: client } = sessionBooking?.client_id ? await database.from("clients").select("email").eq("id", sessionBooking.client_id).maybeSingle() : { data: null };
+      const expectedEmail = (client?.email ?? sessionBooking?.guest_email ?? "").toLowerCase();
+      if (!sessionBooking || !expectedEmail || event.attendeeEmail !== expectedEmail) return NextResponse.json({ error: "Client session booking does not match." }, { status: 404 });
       if (event.triggerEvent === "BOOKING_CANCELLED") {
         if (sessionBooking.provider_booking_id && sessionBooking.provider_booking_id !== event.bookingId) throw new Error("CALCOM_BOOKING_MISMATCH");
         const { error: updateError } = await database.from("client_session_bookings").update({ status: "CANCELLED", cancelled_at: new Date().toISOString() }).eq("id", sessionBooking.id);

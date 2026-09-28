@@ -8,6 +8,12 @@ const calUrl = z.string().trim().url().superRefine((value, context) => {
   }
 });
 
+export const publicSessionSchema = z.object({
+  name: z.string().trim().min(2).max(120),
+  email: z.string().trim().toLowerCase().email().max(254),
+  website: z.string().max(0).optional().or(z.literal(""))
+});
+
 export const consultationSubmissionSchema = z.object({
   name: z.string().trim().min(2).max(120),
   email: z.string().trim().toLowerCase().email().max(254),
