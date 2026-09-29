@@ -43,7 +43,7 @@ export function LandingNav({ items }: { items: { href: string; label: string }[]
             ))}
           </nav>
           <div className="mt-3 grid gap-2">
-            <a href="#account-email" onClick={() => setOpen(false)} className="inline-flex min-h-11 items-center justify-center rounded-full border border-white/15 text-sm font-semibold text-white">Sign In</a>
+            <a href="#account-pin" onClick={() => setOpen(false)} className="inline-flex min-h-11 items-center justify-center rounded-full border border-white/15 text-sm font-semibold text-white">Sign In</a>
             <Link href="/client/register" onClick={() => setOpen(false)} className="kym-action inline-flex min-h-11 items-center justify-center rounded-full text-sm font-semibold text-white">Create Account</Link>
           </div>
         </div>

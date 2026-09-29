@@ -102,7 +102,7 @@ export default function Home() {
               ))}
             </nav>
             <div className="ml-auto flex items-center gap-3 lg:ml-0 lg:w-[220px] lg:justify-end">
-              <a href="#account-email" className="text-xs font-semibold text-white underline decoration-[#22D3EE]/70 underline-offset-4 transition duration-200 hover:decoration-[#D946EF]">Sign In</a>
+              <a href="#account-pin" className="text-xs font-semibold text-white underline decoration-[#22D3EE]/70 underline-offset-4 transition duration-200 hover:decoration-[#D946EF]">Sign In</a>
               <Link href="/client/register" className="kym-action inline-flex cursor-pointer items-center rounded-full px-3 py-1.5 text-[11px] font-semibold text-white transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(34,211,238,.3)] active:translate-y-0 motion-reduce:transform-none">Create Account</Link>
             </div>
           </header>
