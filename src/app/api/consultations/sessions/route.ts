@@ -1,9 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { ZodError } from "zod";
 import { buildClientSessionBookingUrl } from "@/lib/clients/booking";
-import { publicSessionSchema } from "@/lib/consultations/validation";
+import { getClientContext } from "@/lib/clients/session";
 import { clientSessionDurationMinutes } from "@/lib/clients/validation";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -11,31 +9,23 @@ export const runtime = "nodejs";
 export async function POST(request: NextRequest) {
   const origin = request.headers.get("origin");
   if (origin && origin !== request.nextUrl.origin) return NextResponse.json({ error: "Request origin is not allowed." }, { status: 403 });
-  const database = createSupabaseAdminClient();
+  const clientContext = await getClientContext();
+  if (!clientContext) return NextResponse.json({ error: "Sign in with your client account to book a 15-minute session." }, { status: 401 });
+  const { client, database } = clientContext;
   try {
-    const form = await request.formData();
-    const input = publicSessionSchema.parse({
-      name: form.get("name"),
-      email: form.get("email"),
-      website: form.get("website") ?? ""
-    });
-    const { data: settingsRows, error: settingsError } = await database
+    const { data: settings, error: settingsError } = await database
       .from("consultation_settings")
-      .select("owner_id, client_session_booking_url, client_sessions_active")
-      .eq("client_sessions_active", true)
-      .limit(2);
-    if (settingsError || settingsRows?.length !== 1 || !settingsRows[0].client_session_booking_url) {
+      .select("client_session_booking_url, client_sessions_active")
+      .eq("owner_id", client.owner_id)
+      .maybeSingle();
+    if (settingsError || !settings?.client_sessions_active || !settings.client_session_booking_url) {
       return NextResponse.json({ error: "15-minute booking is not open yet." }, { status: 503 });
     }
-    const settings = settingsRows[0];
-    const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { count } = await database.from("client_session_bookings").select("id", { count: "exact", head: true }).eq("guest_email", input.email).gte("created_at", since);
-    if ((count ?? 0) >= 3) return NextResponse.json({ error: "Too many recent bookings. Please try again later." }, { status: 429 });
+    const { count } = await database.from("client_session_bookings").select("id", { count: "exact", head: true }).eq("client_id", client.id).eq("status", "RELEASED");
+    if ((count ?? 0) >= 3) return NextResponse.json({ error: "Finish or cancel an open session before booking another." }, { status: 429 });
     const { data: booking, error } = await database.from("client_session_bookings").insert({
-      owner_id: settings.owner_id,
-      client_id: null,
-      guest_name: input.name,
-      guest_email: input.email,
+      owner_id: client.owner_id,
+      client_id: client.id,
       duration_minutes: clientSessionDurationMinutes,
       status: "RELEASED"
     }).select("id").single();
@@ -44,13 +34,12 @@ export async function POST(request: NextRequest) {
       bookingId: booking.id,
       bookingUrl: buildClientSessionBookingUrl(settings.client_session_booking_url, {
         id: booking.id,
-        client_name: input.name,
-        client_email: input.email
+        client_name: client.full_name,
+        client_email: client.email
       })
     }, { status: 201 });
   } catch (error) {
     log("error", "consultation.public_session_failed", { code: error instanceof Error ? error.message : "UNKNOWN" });
-    const invalid = error instanceof ZodError;
-    return NextResponse.json({ error: invalid ? "Check your name and email, then try again." : "The 15-minute session could not be opened." }, { status: invalid ? 400 : 503 });
+    return NextResponse.json({ error: "The 15-minute session could not be opened." }, { status: 503 });
   }
 }

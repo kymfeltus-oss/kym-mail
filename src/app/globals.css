@@ -1,26 +1,85 @@
 @import "tailwindcss";
 
 :root {
-  color-scheme: light;
-  --navy: #183a5a;
-  --rose: #d95b72;
-  --coral: #e97878;
-  --blush: #f7dde1;
-  --pale-blush: #fff3f4;
-  --warm-white: #fffcfb;
-  --slate: #64748b;
-  --border: #e8e2e3;
+  color-scheme: dark;
+  --kym-canvas: #05070d;
+  --kym-midnight: #070d18;
+  --kym-surface: #101828;
+  --kym-ink: #f4f7fb;
+  --kym-muted: #93a0b5;
+  --kym-line: #1c283c;
+  --kym-cyan: #22d3ee;
+  --kym-blue: #2563eb;
+  --kym-violet: #8b5cf6;
+  --kym-magenta: #d946ef;
 }
+
+@theme {
+  --font-sans: var(--font-inter), Inter, sans-serif;
+  --font-display: var(--font-montserrat), Montserrat, sans-serif;
+}
+
 * { box-sizing: border-box; }
-html { background: var(--warm-white); }
-body { margin: 0; min-height: 100vh; color: var(--navy); background: radial-gradient(circle at 86% 8%, rgba(247,221,225,.72), transparent 29rem), radial-gradient(circle at 4% 92%, rgba(255,243,244,.95), transparent 26rem), var(--warm-white); font-family: Arial, Helvetica, sans-serif; }
-button, input { font: inherit; }
-select, textarea { font: inherit; }
-button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--rose); outline-offset: 3px; }
-.glass { background: rgba(255,252,251,.88); border: 1px solid var(--border); box-shadow: 0 24px 70px rgba(24,58,90,.1); backdrop-filter: blur(18px); }
-.brand-mark { background: linear-gradient(135deg, var(--rose), var(--coral) 58%, #e8a07f); box-shadow: 0 10px 24px rgba(217,91,114,.22); }
-.signature-gradient { background: linear-gradient(90deg, var(--rose), var(--coral), #e8a07f); background-clip: text; color: transparent; }
+html { background: var(--kym-canvas); }
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--kym-ink);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(37, 99, 235, .16), transparent 28rem),
+    radial-gradient(circle at 0% 100%, rgba(139, 92, 246, .1), transparent 24rem),
+    var(--kym-canvas);
+  font-family: var(--font-inter), Inter, sans-serif;
+}
+h1, h2, h3, h4, button, nav, label, legend { font-family: var(--font-montserrat), Montserrat, sans-serif; }
+button, input, select, textarea { font: inherit; }
+input, select, textarea { font-family: var(--font-inter), Inter, sans-serif; }
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), textarea, select {
+  background-color: #0b1220;
+  color: var(--kym-ink);
+}
+button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--kym-cyan); outline-offset: 3px; }
+.glass { background: rgba(16, 24, 40, .9); border: 1px solid var(--kym-line); box-shadow: 0 24px 70px rgba(0, 0, 0, .35); backdrop-filter: blur(18px); }
+.kym-action { background-image: linear-gradient(105deg, #06b6d4 0%, #2563eb 42%, #7c3aed 78%, #c026d3 100%); color: white; }
+.kym-action:hover { filter: brightness(1.06); }
+.kym-rule { height: 2px; width: 7rem; background-image: linear-gradient(90deg, #22d3ee, #3b82f6 46%, #8b5cf6 78%, #d946ef); }
+.kym-hero-art {
+  pointer-events: none;
+  background-image: url("/brand/dashboard-image.png");
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: contain;
+  aspect-ratio: 1672 / 941;
+  width: min(100%, 36rem);
+  margin-inline: auto;
+}
+@media (min-width: 1024px) {
+  .kym-hero-art {
+    position: absolute;
+    inset: 0 auto 0 50%;
+    width: min(100%, 1536px);
+    height: 100%;
+    aspect-ratio: auto;
+    margin: 0;
+    transform: translateX(-50%);
+    background-position: left top;
+    background-size: min(100%, 1180px) auto;
+  }
+}
+@media (min-width: 1280px) {
+  .kym-hero-art {
+    background-size: min(100%, 1320px) auto;
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  .kym-pointer-card:hover { transform: translateY(-6px) scale(1.01); }
+  .kym-pointer-benefit:hover { transform: translateY(-3px); }
+  .kym-pointer-step:hover .kym-step-icon { transform: translateY(-3px); }
+}
 .email-content { overflow-wrap: anywhere; }
-.email-content a { color: var(--rose); text-decoration: underline; }
+.email-content a { color: var(--kym-cyan); text-decoration: underline; }
 .email-content table { max-width: 100%; border-collapse: collapse; }
-.email-content blockquote { margin-left: 0; border-left: 3px solid var(--blush); padding-left: 1rem; color: var(--slate); }
+.email-content blockquote { margin-left: 0; border-left: 3px solid #1d4e89; padding-left: 1rem; color: var(--kym-muted); }

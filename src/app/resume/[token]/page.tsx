@@ -19,5 +19,5 @@ export default async function SharedResumePage({ params }: { params: Promise<{ t
   if (versionError || !version || !version.approved_at || !["APPROVED", "STALE"].includes(version.status)) notFound();
   const content = toPublicResume(resumeContentSchema.parse(version.content));
   await database.from("resume_shares").update({ last_accessed_at: new Date().toISOString(), access_count: Number(share.access_count ?? 0) + 1 }).eq("id", share.id).eq("status", "ACTIVE");
-  return <main className="min-h-screen bg-[#ECE6E3] px-3 py-3 sm:px-6 sm:py-8 lg:px-10"><div className="mx-auto max-w-6xl"><ExecutiveResume content={content} /><footer className="py-8 text-center text-[10px] font-semibold uppercase tracking-[.2em] text-[#806F77]">Private recipient view · KYM Mail</footer></div></main>;
+  return <main className="min-h-screen bg-[#101828] px-3 py-3 sm:px-6 sm:py-8 lg:px-10"><div className="mx-auto max-w-6xl"><ExecutiveResume content={content} /><footer className="py-8 text-center text-[10px] font-semibold uppercase tracking-[.2em] text-[#93A0B5]">Private recipient view · KYM Mail</footer></div></main>;
 }

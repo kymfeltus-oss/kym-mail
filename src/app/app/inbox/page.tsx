@@ -35,8 +35,8 @@ export default async function InboxPage() {
   return <AppShell email={owner.user.email} canSignOut={owner.mode === "authenticated"} active="inbox">
     <div className="mx-auto max-w-5xl">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div><p className="text-xs font-semibold uppercase tracking-[.22em] text-[#D95B72]">Unified mailbox</p><h1 className="mt-2 text-3xl font-semibold tracking-[-.03em] text-[#183A5A] sm:text-4xl">Inbox</h1></div>
-        <Link href="/app/compose" className="rounded-full bg-[#D95B72] px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(217,91,114,.22)] transition hover:bg-[#C94C64]">Compose</Link>
+        <div><p className="text-xs font-semibold uppercase tracking-[.22em] text-[#22D3EE]">Unified mailbox</p><h1 className="mt-2 text-3xl font-semibold tracking-[-.03em] text-[#F4F7FB] sm:text-4xl">Inbox</h1></div>
+        <Link href="/app/compose" className="rounded-full kym-action px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(37,99,235,.22)] transition ">Compose</Link>
       </div>
 
       <GmailConnectionPanel connection={connection ?? null} availableIdentityCount={availableIdentityCount} />

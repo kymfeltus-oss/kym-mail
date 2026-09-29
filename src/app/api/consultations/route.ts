@@ -6,6 +6,7 @@ import { createConsultationToken, hashConsultationToken } from "@/lib/consultati
 import { consultationSubmissionSchema } from "@/lib/consultations/validation";
 import { sendConsultationNotification } from "@/lib/consultations/notifications";
 import { consultationKindForHistory, consultationOffering } from "@/lib/consultations/offerings";
+import { getClientContext } from "@/lib/clients/session";
 import { log } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -22,6 +23,11 @@ export async function POST(request: NextRequest) {
       name: form.get("name"), email: form.get("email"), phone: form.get("phone") ?? "",
       consultationKind: form.get("consultationKind"), note: form.get("note") ?? "", website: form.get("website") ?? ""
     });
+    const clientContext = input.consultationKind === "RETURNING" ? await getClientContext() : null;
+    if (input.consultationKind === "RETURNING" && !clientContext) return NextResponse.json({ error: "Log in to book the 1 Hour Consultation." }, { status: 401 });
+    const clientName = clientContext?.client.full_name ?? input.name;
+    const clientEmail = clientContext?.client.email ?? input.email;
+    const clientPhone = clientContext?.client.phone || input.phone;
     const proofFile = form.get("paymentProof");
     if (!(proofFile instanceof File)) return NextResponse.json({ error: "Upload a PNG, JPG, JPEG, or PDF payment proof." }, { status: 400 });
     const proof = await validateConsultationProof(proofFile);
@@ -33,7 +39,7 @@ export async function POST(request: NextRequest) {
     const { count: completedFirstTimeCount, error: historyError } = await database.from("consultation_requests")
       .select("id", { count: "exact", head: true })
       .eq("owner_id", settings.owner_id)
-      .eq("client_email", input.email)
+      .eq("client_email", clientEmail)
       .eq("consultation_kind", "FIRST_TIME")
       .eq("payment_status", "BOOKED")
       .lt("booking_end_at", new Date().toISOString());
@@ -45,7 +51,7 @@ export async function POST(request: NextRequest) {
     const offering = consultationOffering(eligibleKind);
 
     const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { count } = await database.from("consultation_requests").select("id", { count: "exact", head: true }).eq("client_email", input.email).gte("created_at", since);
+    const { count } = await database.from("consultation_requests").select("id", { count: "exact", head: true }).eq("client_email", clientEmail).gte("created_at", since);
     if ((count ?? 0) >= 3) return NextResponse.json({ error: "Too many recent submissions. Please try again later." }, { status: 429 });
 
     const requestId = randomUUID();
@@ -57,9 +63,9 @@ export async function POST(request: NextRequest) {
     const { error: insertError } = await database.from("consultation_requests").insert({
       id: requestId,
       owner_id: settings.owner_id,
-      client_name: input.name,
-      client_email: input.email,
-      client_phone: input.phone || null,
+      client_name: clientName,
+      client_email: clientEmail,
+      client_phone: clientPhone || null,
       consultation_type: offering.name,
       consultation_kind: offering.kind,
       expected_amount_cents: offering.priceCents,
@@ -75,7 +81,7 @@ export async function POST(request: NextRequest) {
     if (insertError) throw new Error("CONSULTATION_REQUEST_PERSISTENCE_FAILED");
     await database.from("consultation_events").insert({ owner_id: settings.owner_id, consultation_request_id: requestId, event_type: "PAYMENT_PROOF_SUBMITTED", actor_type: "CLIENT" });
 
-    const notification = { ownerId: settings.owner_id, requestId, clientName: input.name, clientEmail: input.email, consultationName: offering.name, expectedAmountCents: offering.priceCents };
+    const notification = { ownerId: settings.owner_id, requestId, clientName, clientEmail, consultationName: offering.name, expectedAmountCents: offering.priceCents };
     const [clientNotified, ownerNotified] = await Promise.all([
       sendConsultationNotification(database, { ...notification, kind: "PROOF_RECEIVED" }),
       sendConsultationNotification(database, { ...notification, kind: "OWNER_REVIEW" })

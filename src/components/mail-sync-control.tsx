@@ -35,15 +35,15 @@ export function MailSyncControl({ connected, initialSyncComplete, lastSyncedAt, 
 
   if (!connected) return null;
   return <div className="mt-5 flex flex-wrap items-center gap-3">
-    <button type="button" onClick={() => void synchronize()} disabled={state === "syncing"} className="rounded-full border border-[#D95B72] px-4 py-2 text-xs font-semibold text-[#A73D52] transition hover:bg-[#FFF3F4] disabled:cursor-wait disabled:opacity-60">
+    <button type="button" onClick={() => void synchronize()} disabled={state === "syncing"} className="rounded-full border border-[#22D3EE] px-4 py-2 text-xs font-semibold text-[#67E8F9] transition hover:bg-[#122033] disabled:cursor-wait disabled:opacity-60">
       {state === "syncing" ? "Synchronizing…" : initialSyncComplete ? "Sync now" : "Start mailbox sync"}
     </button>
-    <p className="text-xs text-[#64748B]">
+    <p className="text-xs text-[#93A0B5]">
       {state === "syncing" ? "Retrieving real Gmail messages…" : state === "complete" ? "Mailbox synchronized." : lastSyncedAt ? `Last synchronized ${formatMailTimestamp(lastSyncedAt)}` : "Mailbox has not synchronized yet."}
     </p>
     {error && <div className="flex w-full flex-wrap items-center gap-3">
-      <p role="alert" className="text-xs text-[#A73D52]">{error}</p>
-      <Link href="/api/oauth/google/start" className="rounded-full bg-[#D95B72] px-4 py-2 text-xs font-semibold text-white">Reconnect Google Mail</Link>
+      <p role="alert" className="text-xs text-[#67E8F9]">{error}</p>
+      <Link href="/api/oauth/google/start" className="rounded-full kym-action px-4 py-2 text-xs font-semibold text-white">Reconnect Google Mail</Link>
     </div>}
   </div>;
 }

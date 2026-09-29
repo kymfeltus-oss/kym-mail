@@ -120,60 +120,60 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
     {draft?.replyToMessageId && <input type="hidden" name="replyToMessageId" value={draft.replyToMessageId} />}
     {forwardedAttachments.map((attachment) => <input key={attachment.id} type="hidden" name="forwardAttachmentIds" value={attachment.id} />)}
     <div className="grid min-w-0 gap-5">
-      <label className="grid min-w-0 gap-2 text-sm font-semibold text-[#183A5A]">Project
-        <select name="projectId" value={projectId} onChange={(event) => selectProject(event.target.value)} className="w-full min-w-0 rounded-xl border border-[#E8E2E3] bg-[#FFFCFB] px-4 py-3 font-normal text-[#183A5A] outline-none focus:border-[#D95B72]">
+      <label className="grid min-w-0 gap-2 text-sm font-semibold text-[#F4F7FB]">Project
+        <select name="projectId" value={projectId} onChange={(event) => selectProject(event.target.value)} className="w-full min-w-0 rounded-xl border border-[#1C283C] bg-[#101828] px-4 py-3 font-normal text-[#F4F7FB] outline-none focus:border-[#22D3EE]">
           <option value="">None</option>
           {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
         </select>
-        <span className="font-normal text-[#64748B]">Optional. Ordinary email does not require a Project.</span>
+        <span className="font-normal text-[#93A0B5]">Optional. Ordinary email does not require a Project.</span>
       </label>
-      {defaultIdentityUnavailable && <div role="alert" className="rounded-2xl border border-[#F0C9D0] bg-[#FFF3F4] px-4 py-3"><p className="text-sm font-semibold text-[#A73D52]">Project default sender is unavailable</p><p className="mt-1 text-xs leading-5 text-[#64748B]">Choose a verified From identity explicitly. KYM Mail will not switch senders silently.</p></div>}
-      <label className="grid min-w-0 gap-2 text-sm font-semibold text-[#183A5A]">From
-        <select name="from" value={from} onChange={(event) => applyFrom(event.target.value)} required className="w-full min-w-0 rounded-xl border border-[#E8E2E3] bg-[#FFFCFB] px-4 py-3 font-normal text-[#183A5A] outline-none focus:border-[#D95B72]">
+      {defaultIdentityUnavailable && <div role="alert" className="rounded-2xl border border-[#1D4E89] bg-[#122033] px-4 py-3"><p className="text-sm font-semibold text-[#67E8F9]">Project default sender is unavailable</p><p className="mt-1 text-xs leading-5 text-[#93A0B5]">Choose a verified From identity explicitly. KYM Mail will not switch senders silently.</p></div>}
+      <label className="grid min-w-0 gap-2 text-sm font-semibold text-[#F4F7FB]">From
+        <select name="from" value={from} onChange={(event) => applyFrom(event.target.value)} required className="w-full min-w-0 rounded-xl border border-[#1C283C] bg-[#101828] px-4 py-3 font-normal text-[#F4F7FB] outline-none focus:border-[#22D3EE]">
           <option value="">Select a verified sender</option>
           {identities.map((identity) => <option key={identity.id} value={identity.email_address}>{identity.email_address} — {identity.label}</option>)}
         </select>
       </label>
-      <label className="grid min-w-0 gap-2 text-sm font-semibold text-[#183A5A]">Company
-        <select name="emailLook" value={look} onChange={(event) => { if (isEmailLook(event.target.value)) setLook(event.target.value); }} className="w-full min-w-0 rounded-xl border border-[#E8E2E3] bg-[#FFFCFB] px-4 py-3 font-normal text-[#183A5A] outline-none focus:border-[#D95B72]">
+      <label className="grid min-w-0 gap-2 text-sm font-semibold text-[#F4F7FB]">Company
+        <select name="emailLook" value={look} onChange={(event) => { if (isEmailLook(event.target.value)) setLook(event.target.value); }} className="w-full min-w-0 rounded-xl border border-[#1C283C] bg-[#101828] px-4 py-3 font-normal text-[#F4F7FB] outline-none focus:border-[#22D3EE]">
           {emailLooks.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
         </select>
-        <span className="font-normal text-[#64748B]">The selected company stationery and your signature go to the recipient.</span>
+        <span className="font-normal text-[#93A0B5]">The selected company stationery and your signature go to the recipient.</span>
       </label>
-      <label className="grid min-w-0 gap-2 text-sm font-semibold text-[#183A5A]">To
-        <input name="to" type="text" inputMode="email" required defaultValue={draft?.to} placeholder="recipient@example.com" className="w-full min-w-0 rounded-xl border border-[#E8E2E3] bg-[#FFFCFB] px-4 py-3 font-normal outline-none placeholder:text-[#94A3B8] focus:border-[#D95B72]" />
+      <label className="grid min-w-0 gap-2 text-sm font-semibold text-[#F4F7FB]">To
+        <input name="to" type="text" inputMode="email" required defaultValue={draft?.to} placeholder="recipient@example.com" className="w-full min-w-0 rounded-xl border border-[#1C283C] bg-[#101828] px-4 py-3 font-normal outline-none placeholder:text-[#93A0B5] focus:border-[#22D3EE]" />
       </label>
-      {!advanced && <button type="button" onClick={() => setAdvanced(true)} className="w-fit text-xs font-semibold text-[#A73D52]">Add CC or BCC</button>}
+      {!advanced && <button type="button" onClick={() => setAdvanced(true)} className="w-fit text-xs font-semibold text-[#67E8F9]">Add CC or BCC</button>}
       {advanced && <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-        <label className="grid min-w-0 gap-2 text-sm font-semibold text-[#183A5A]">CC<input name="cc" type="text" inputMode="email" className="w-full min-w-0 rounded-xl border border-[#E8E2E3] bg-[#FFFCFB] px-4 py-3 font-normal outline-none focus:border-[#D95B72]" /></label>
-        <label className="grid min-w-0 gap-2 text-sm font-semibold text-[#183A5A]">BCC<input name="bcc" type="text" inputMode="email" className="w-full min-w-0 rounded-xl border border-[#E8E2E3] bg-[#FFFCFB] px-4 py-3 font-normal outline-none focus:border-[#D95B72]" /></label>
+        <label className="grid min-w-0 gap-2 text-sm font-semibold text-[#F4F7FB]">CC<input name="cc" type="text" inputMode="email" className="w-full min-w-0 rounded-xl border border-[#1C283C] bg-[#101828] px-4 py-3 font-normal outline-none focus:border-[#22D3EE]" /></label>
+        <label className="grid min-w-0 gap-2 text-sm font-semibold text-[#F4F7FB]">BCC<input name="bcc" type="text" inputMode="email" className="w-full min-w-0 rounded-xl border border-[#1C283C] bg-[#101828] px-4 py-3 font-normal outline-none focus:border-[#22D3EE]" /></label>
       </div>}
-      <label className="grid min-w-0 gap-2 text-sm font-semibold text-[#183A5A]">Subject
-        <input name="subject" type="text" required maxLength={200} value={subject} onChange={(event) => setSubject(event.target.value)} className="w-full min-w-0 rounded-xl border border-[#E8E2E3] bg-[#FFFCFB] px-4 py-3 font-normal outline-none focus:border-[#D95B72]" />
+      <label className="grid min-w-0 gap-2 text-sm font-semibold text-[#F4F7FB]">Subject
+        <input name="subject" type="text" required maxLength={200} value={subject} onChange={(event) => setSubject(event.target.value)} className="w-full min-w-0 rounded-xl border border-[#1C283C] bg-[#101828] px-4 py-3 font-normal outline-none focus:border-[#22D3EE]" />
       </label>
-      <label className="grid min-w-0 gap-2 text-sm font-semibold text-[#183A5A]">Message
-        <textarea name="body" required rows={12} value={body} onChange={(event) => setBody(event.target.value)} placeholder="Write your message…" className="w-full min-w-0 resize-y rounded-xl border border-[#E8E2E3] bg-[#FFFCFB] px-4 py-3 font-normal leading-7 outline-none placeholder:text-[#94A3B8] focus:border-[#D95B72]" />
-        <span className="font-normal text-[#64748B]">Blank lines become paragraphs. Lines that start with - become a list. The recipient receives this designed version.</span>
+      <label className="grid min-w-0 gap-2 text-sm font-semibold text-[#F4F7FB]">Message
+        <textarea name="body" required rows={12} value={body} onChange={(event) => setBody(event.target.value)} placeholder="Write your message…" className="w-full min-w-0 resize-y rounded-xl border border-[#1C283C] bg-[#101828] px-4 py-3 font-normal leading-7 outline-none placeholder:text-[#93A0B5] focus:border-[#22D3EE]" />
+        <span className="font-normal text-[#93A0B5]">Blank lines become paragraphs. Lines that start with - become a list. The recipient receives this designed version.</span>
       </label>
       <section aria-label="Recipient preview" className="border p-3" style={{ background: previewChrome.masthead, borderColor: previewChrome.masthead }}>
         <p className="px-2 text-[10px] font-semibold uppercase tracking-[.28em]" style={{ color: previewChrome.accent }}>Recipient preview</p>
         <iframe title="How the recipient will see this message" sandbox="" srcDoc={buildProfessionalEmailHtml({ from: from || "your verified sender", subject: subject || "Message preview", body: body || "Your message will appear here.", look })} className="mt-3 h-[520px] w-full border-0" style={{ background: previewChrome.page }} />
       </section>
       <div>
-        <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-[#E8E2E3] px-4 py-2 text-xs font-semibold text-[#183A5A] transition hover:bg-[#FFF3F4]"><Paperclip className="size-4 text-[#D95B72]" /> Attach files<input name="attachments" type="file" multiple className="sr-only" onChange={(event) => setFiles(Array.from(event.target.files ?? []))} /></label>
+        <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-[#1C283C] px-4 py-2 text-xs font-semibold text-[#F4F7FB] transition hover:bg-[#122033]"><Paperclip className="size-4 text-[#22D3EE]" /> Attach files<input name="attachments" type="file" multiple className="sr-only" onChange={(event) => setFiles(Array.from(event.target.files ?? []))} /></label>
         {(forwardedAttachments.length > 0 || files.length > 0) && <ul className="mt-3 space-y-2">
-          {forwardedAttachments.map((attachment) => <li key={attachment.id} className="flex items-center justify-between rounded-xl bg-[#FFF3F4] px-3 py-2 text-xs text-[#64748B]"><span className="truncate">{attachment.filename} · {(attachment.sizeBytes / 1024).toFixed(1)} KB · from original message</span><button type="button" aria-label={`Remove ${attachment.filename}`} onClick={() => setForwardedAttachments((current) => current.filter((item) => item.id !== attachment.id))}><X className="size-4" /></button></li>)}
-          {files.map((file, index) => <li key={`${file.name}-${file.size}-${index}`} className="flex items-center justify-between rounded-xl bg-[#FFF3F4] px-3 py-2 text-xs text-[#64748B]"><span className="truncate">{file.name} · {(file.size / 1024).toFixed(1)} KB</span><button type="button" aria-label={`Remove ${file.name}`} onClick={() => setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))}><X className="size-4" /></button></li>)}
+          {forwardedAttachments.map((attachment) => <li key={attachment.id} className="flex items-center justify-between rounded-xl bg-[#122033] px-3 py-2 text-xs text-[#93A0B5]"><span className="truncate">{attachment.filename} · {(attachment.sizeBytes / 1024).toFixed(1)} KB · from original message</span><button type="button" aria-label={`Remove ${attachment.filename}`} onClick={() => setForwardedAttachments((current) => current.filter((item) => item.id !== attachment.id))}><X className="size-4" /></button></li>)}
+          {files.map((file, index) => <li key={`${file.name}-${file.size}-${index}`} className="flex items-center justify-between rounded-xl bg-[#122033] px-3 py-2 text-xs text-[#93A0B5]"><span className="truncate">{file.name} · {(file.size / 1024).toFixed(1)} KB</span><button type="button" aria-label={`Remove ${file.name}`} onClick={() => setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))}><X className="size-4" /></button></li>)}
         </ul>}
       </div>
     </div>
-    {error && <p role="alert" className="mt-5 rounded-xl bg-[#FFF3F4] px-4 py-3 text-sm text-[#A73D52]">{error}</p>}
-    {scheduleOpen && <section aria-label="Schedule delivery" className="mt-6 rounded-2xl border border-[#E7B8C1] bg-[#FFF3F4] p-4 sm:p-5">
-      <div className="flex items-start justify-between gap-4"><div><h2 className="text-sm font-semibold text-[#183A5A]">Schedule delivery</h2><p className="mt-1 text-xs leading-5 text-[#64748B]">KYM Mail will send automatically using the approved message and sender.</p></div><button type="button" aria-label="Close scheduling" onClick={() => setScheduleOpen(false)} className="rounded-lg p-1 text-[#64748B]"><X className="size-4" /></button></div>
-      <label className="mt-4 grid gap-2 text-sm font-semibold text-[#183A5A]">Date and time<input type="datetime-local" value={scheduledLocal} min={localInputValue(new Date(Date.now() + 60_000))} onChange={(event) => setScheduledLocal(event.target.value)} className="w-full rounded-xl border border-[#E8E2E3] bg-[#FFFCFB] px-4 py-3 font-normal outline-none focus:border-[#D95B72]" /></label>
-      <p className="mt-3 text-sm font-semibold text-[#A73D52]">{schedulePreview}</p><p className="mt-1 text-xs text-[#64748B]">Timezone: {timezone}</p>
-      <button type="button" onClick={() => void schedule()} disabled={status === "scheduling" || !identities.length || !from} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#183A5A] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto"><CalendarClock className="size-4" /> {status === "scheduling" ? "Scheduling…" : "Confirm schedule"}</button>
+    {error && <p role="alert" className="mt-5 rounded-xl bg-[#122033] px-4 py-3 text-sm text-[#67E8F9]">{error}</p>}
+    {scheduleOpen && <section aria-label="Schedule delivery" className="mt-6 rounded-2xl border border-[#1D4E89] bg-[#122033] p-4 sm:p-5">
+      <div className="flex items-start justify-between gap-4"><div><h2 className="text-sm font-semibold text-[#F4F7FB]">Schedule delivery</h2><p className="mt-1 text-xs leading-5 text-[#93A0B5]">KYM Mail will send automatically using the approved message and sender.</p></div><button type="button" aria-label="Close scheduling" onClick={() => setScheduleOpen(false)} className="rounded-lg p-1 text-[#93A0B5]"><X className="size-4" /></button></div>
+      <label className="mt-4 grid gap-2 text-sm font-semibold text-[#F4F7FB]">Date and time<input type="datetime-local" value={scheduledLocal} min={localInputValue(new Date(Date.now() + 60_000))} onChange={(event) => setScheduledLocal(event.target.value)} className="w-full rounded-xl border border-[#1C283C] bg-[#101828] px-4 py-3 font-normal outline-none focus:border-[#22D3EE]" /></label>
+      <p className="mt-3 text-sm font-semibold text-[#67E8F9]">{schedulePreview}</p><p className="mt-1 text-xs text-[#93A0B5]">Timezone: {timezone}</p>
+      <button type="button" onClick={() => void schedule()} disabled={status === "scheduling" || !identities.length || !from} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#0E1C33] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto"><CalendarClock className="size-4" /> {status === "scheduling" ? "Scheduling…" : "Confirm schedule"}</button>
     </section>}
-    <div className="mt-7 flex flex-wrap justify-end gap-3"><button type="button" onClick={() => setScheduleOpen((current) => !current)} disabled={status === "sending" || status === "scheduling" || !identities.length || !from} className="inline-flex items-center gap-2 rounded-full border border-[#D95B72] bg-[#FFFCFB] px-6 py-3 text-sm font-semibold text-[#A73D52] disabled:opacity-60"><CalendarClock className="size-4" /> Schedule send</button><button type="submit" disabled={status === "sending" || status === "scheduling" || !identities.length || !from} className="inline-flex items-center gap-2 rounded-full bg-[#D95B72] px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(217,91,114,.22)] transition hover:bg-[#C94C64] disabled:cursor-not-allowed disabled:opacity-60"><Send className="size-4" /> {status === "sending" ? "Sending…" : draft?.mode === "reply" ? "Send reply" : draft?.mode === "forward" ? "Forward now" : "Send now"}</button></div>
+    <div className="mt-7 flex flex-wrap justify-end gap-3"><button type="button" onClick={() => setScheduleOpen((current) => !current)} disabled={status === "sending" || status === "scheduling" || !identities.length || !from} className="inline-flex items-center gap-2 rounded-full border border-[#22D3EE] bg-[#101828] px-6 py-3 text-sm font-semibold text-[#67E8F9] disabled:opacity-60"><CalendarClock className="size-4" /> Schedule send</button><button type="submit" disabled={status === "sending" || status === "scheduling" || !identities.length || !from} className="inline-flex items-center gap-2 rounded-full kym-action px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(37,99,235,.22)] transition  disabled:cursor-not-allowed disabled:opacity-60"><Send className="size-4" /> {status === "sending" ? "Sending…" : draft?.mode === "reply" ? "Send reply" : draft?.mode === "forward" ? "Forward now" : "Send now"}</button></div>
   </form>;
 }

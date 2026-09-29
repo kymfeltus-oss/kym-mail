@@ -17,11 +17,11 @@ export default async function TargetedResumePage({ params }: { params: Promise<{
   return (
     <AppShell email={owner.user.email} canSignOut={owner.mode === "authenticated"} active="resumes">
       <main className="mx-auto max-w-6xl">
-        <Link href="/app/resumes" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[#70626A]"><ArrowLeft className="size-4" /> Resume</Link>
+        <Link href="/app/resumes" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[#93A0B5]"><ArrowLeft className="size-4" /> Resume</Link>
         <header className="mt-5">
-          <p className="text-xs font-semibold uppercase tracking-[.22em] text-[#8A6A32]">Targeted resume</p>
-          <h1 className="mt-2 break-words text-4xl font-semibold tracking-[-.05em] text-[#3E1D2C] sm:text-5xl">{target.title}</h1>
-          <p className="mt-2 text-base font-semibold text-[#70626A]">{target.employer}</p>
+          <p className="text-xs font-semibold uppercase tracking-[.22em] text-[#22D3EE]">Targeted resume</p>
+          <h1 className="mt-2 break-words text-4xl font-semibold tracking-[-.05em] text-[#F4F7FB] sm:text-5xl">{target.title}</h1>
+          <p className="mt-2 text-base font-semibold text-[#93A0B5]">{target.employer}</p>
         </header>
         <ResumeTargetStudio target={target} />
       </main>

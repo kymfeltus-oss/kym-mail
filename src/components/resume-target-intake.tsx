@@ -51,22 +51,22 @@ export function ResumeTargetIntake() {
   }
 
   return (
-    <form onSubmit={submit} className="mt-8 rounded-[2rem] border border-[#E7DBD8] bg-[#FFFDFC] p-5 shadow-[0_24px_80px_rgba(73,24,42,.08)] sm:p-8">
+    <form onSubmit={submit} className="mt-8 rounded-[2rem] border border-[#1C283C] bg-[#101828] p-5 shadow-[0_24px_80px_rgba(0,0,0,.08)] sm:p-8">
       <div className="grid gap-4 sm:grid-cols-2">
-        <label className="text-sm font-semibold text-[#3E1D2C]">Role title<input required minLength={2} maxLength={300} value={title} onChange={(event) => setTitle(event.target.value)} className="mt-2 min-h-12 w-full rounded-2xl border border-[#E7DBD8] bg-white px-4 font-normal text-[#554850]" /></label>
-        <label className="text-sm font-semibold text-[#3E1D2C]">Company<span className="mt-2 block font-normal text-xs text-[#70626A]">Use Confidential Client when the employer is hidden. The studio will try to identify it from the brief.</span><input required minLength={2} maxLength={200} value={employer} onChange={(event) => setEmployer(event.target.value)} className="mt-2 min-h-12 w-full rounded-2xl border border-[#E7DBD8] bg-white px-4 font-normal text-[#554850]" /></label>
+        <label className="text-sm font-semibold text-[#F4F7FB]">Role title<input required minLength={2} maxLength={300} value={title} onChange={(event) => setTitle(event.target.value)} className="mt-2 min-h-12 w-full rounded-2xl border border-[#1C283C] bg-[#101828] px-4 font-normal text-[#93A0B5]" /></label>
+        <label className="text-sm font-semibold text-[#F4F7FB]">Company<span className="mt-2 block font-normal text-xs text-[#93A0B5]">Use Confidential Client when the employer is hidden. The studio will try to identify it from the brief.</span><input required minLength={2} maxLength={200} value={employer} onChange={(event) => setEmployer(event.target.value)} className="mt-2 min-h-12 w-full rounded-2xl border border-[#1C283C] bg-[#101828] px-4 font-normal text-[#93A0B5]" /></label>
       </div>
       <label
         onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
-        className={`mt-5 block rounded-[1.75rem] border-2 border-dashed p-5 transition ${dragging ? "border-[#8D2948] bg-[#FFF3F4]" : "border-[#E7DBD8] bg-white"}`}
+        className={`mt-5 block rounded-[1.75rem] border-2 border-dashed p-5 transition ${dragging ? "border-[#22D3EE] bg-[#122033]" : "border-[#1C283C] bg-[#101828]"}`}
       >
-        <p className="flex items-center gap-2 text-sm font-semibold text-[#3E1D2C]"><FileUp className="size-4 text-[#8D2948]" /> Drop the job description or paste it</p>
-        <textarea required minLength={120} maxLength={30000} rows={16} value={description} onChange={(event) => setDescription(event.target.value)} className="mt-3 w-full resize-y rounded-2xl border border-[#E7DBD8] bg-[#FFFDFC] p-4 text-sm leading-7 text-[#554850]" />
+        <p className="flex items-center gap-2 text-sm font-semibold text-[#F4F7FB]"><FileUp className="size-4 text-[#22D3EE]" /> Drop the job description or paste it</p>
+        <textarea required minLength={120} maxLength={30000} rows={16} value={description} onChange={(event) => setDescription(event.target.value)} className="mt-3 w-full resize-y rounded-2xl border border-[#1C283C] bg-[#101828] p-4 text-sm leading-7 text-[#93A0B5]" />
       </label>
-      {error && <p role="alert" className="mt-4 rounded-2xl bg-[#FFF1F2] p-3 text-sm text-[#A73D52]">{error}</p>}
-      <button type="submit" disabled={busy} className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-full bg-[#111111] px-6 text-sm font-semibold text-[#F7F1E6] disabled:opacity-60">
+      {error && <p role="alert" className="mt-4 rounded-2xl bg-[#2A1218] p-3 text-sm text-[#67E8F9]">{error}</p>}
+      <button type="submit" disabled={busy} className="mt-6 inline-flex min-h-12 items-center gap-2 rounded-full bg-[#05070D] px-6 text-sm font-semibold text-[#F4F7FB] disabled:opacity-60">
         {busy ? <LoaderCircle className="size-4 animate-spin" /> : null}
         Read the brief and ask me about gaps
       </button>

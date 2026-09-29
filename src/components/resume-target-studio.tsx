@@ -77,63 +77,63 @@ export function ResumeTargetStudio({ target }: { target: TargetResumeView }) {
 
   return (
     <div className="mt-8 space-y-8">
-      {error && <p role="alert" className="rounded-2xl bg-[#FFF1F2] p-3 text-sm text-[#A73D52]">{error}</p>}
-      {target.failureMessage && <p role="alert" className="rounded-2xl bg-[#FFF1F2] p-3 text-sm text-[#A73D52]">{target.failureMessage}</p>}
+      {error && <p role="alert" className="rounded-2xl bg-[#2A1218] p-3 text-sm text-[#67E8F9]">{error}</p>}
+      {target.failureMessage && <p role="alert" className="rounded-2xl bg-[#2A1218] p-3 text-sm text-[#67E8F9]">{target.failureMessage}</p>}
       <ResumeTargetIntelligencePanel target={target} />
 
-      <section className="rounded-[2rem] border border-[#E7DBD8] bg-[#FFFDFC] p-5 sm:p-7">
-        <p className="text-xs font-semibold uppercase tracking-[.18em] text-[#8D2948]">Already on the page</p>
-        <h2 className="mt-2 text-2xl font-semibold text-[#3E1D2C]">Matched to your Career Profile</h2>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-[#70626A]">These requirements already have confirmed evidence. They will be elevated in this version.</p>
+      <section className="rounded-[2rem] border border-[#1C283C] bg-[#101828] p-5 sm:p-7">
+        <p className="text-xs font-semibold uppercase tracking-[.18em] text-[#22D3EE]">Already on the page</p>
+        <h2 className="mt-2 text-2xl font-semibold text-[#F4F7FB]">Matched to your Career Profile</h2>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-[#93A0B5]">These requirements already have confirmed evidence. They will be elevated in this version.</p>
         <div className="mt-5 space-y-3">
           {matched.length ? matched.map((item) => (
-            <article key={item.id} className="rounded-2xl border border-[#CFE8DD] bg-[#F5FCF8] p-4">
-              <p className="text-[10px] font-semibold uppercase tracking-[.12em] text-[#176B4C]">{stateLabel[item.matchState]} · {item.category.toLowerCase()}</p>
-              <p className="mt-2 text-sm font-semibold leading-6 text-[#183A5A]">{item.originalText}</p>
-              {item.matchedEvidence[0] && <p className="mt-2 text-xs leading-5 text-[#465B70]">{item.matchedEvidence[0].label}: {item.matchedEvidence[0].excerpt}</p>}
+            <article key={item.id} className="rounded-2xl border border-[#14523A] bg-[#0C241C] p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-[.12em] text-[#34D399]">{stateLabel[item.matchState]} · {item.category.toLowerCase()}</p>
+              <p className="mt-2 text-sm font-semibold leading-6 text-[#F4F7FB]">{item.originalText}</p>
+              {item.matchedEvidence[0] && <p className="mt-2 text-xs leading-5 text-[#93A0B5]">{item.matchedEvidence[0].label}: {item.matchedEvidence[0].excerpt}</p>}
             </article>
-          )) : <p className="text-sm text-[#70626A]">No confirmed matches were found. Confirm the gaps below so this version stays honest.</p>}
+          )) : <p className="text-sm text-[#93A0B5]">No confirmed matches were found. Confirm the gaps below so this version stays honest.</p>}
         </div>
       </section>
 
-      <section className="rounded-[2rem] border border-[#E7DBD8] bg-[#FFFDFC] p-5 sm:p-7">
-        <p className="text-xs font-semibold uppercase tracking-[.18em] text-[#8D2948]">Your call</p>
-        <h2 className="mt-2 text-2xl font-semibold text-[#3E1D2C]">Do you have this experience?</h2>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-[#70626A]">If yes, write the experience in your own words. That prompt becomes part of this resume. If no, it stays off the page.</p>
+      <section className="rounded-[2rem] border border-[#1C283C] bg-[#101828] p-5 sm:p-7">
+        <p className="text-xs font-semibold uppercase tracking-[.18em] text-[#22D3EE]">Your call</p>
+        <h2 className="mt-2 text-2xl font-semibold text-[#F4F7FB]">Do you have this experience?</h2>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-[#93A0B5]">If yes, write the experience in your own words. That prompt becomes part of this resume. If no, it stays off the page.</p>
         <div className="mt-6 space-y-4">
           {pending.length ? pending.map((item) => {
             const current = answers[item.id] ?? { answer: "", promptText: "" };
             return (
-              <article key={item.id} className="rounded-2xl border border-[#E7DBD8] bg-white p-4 sm:p-5">
-                <p className="text-[10px] font-semibold uppercase tracking-[.12em] text-[#8D2948]">{stateLabel[item.matchState]} · {item.importance.toLowerCase()}</p>
-                <p className="mt-2 text-sm font-semibold leading-6 text-[#3E1D2C]">{item.originalText}</p>
-                <p className="mt-2 text-xs leading-5 text-[#70626A]">{item.explanation}</p>
+              <article key={item.id} className="rounded-2xl border border-[#1C283C] bg-[#101828] p-4 sm:p-5">
+                <p className="text-[10px] font-semibold uppercase tracking-[.12em] text-[#22D3EE]">{stateLabel[item.matchState]} · {item.importance.toLowerCase()}</p>
+                <p className="mt-2 text-sm font-semibold leading-6 text-[#F4F7FB]">{item.originalText}</p>
+                <p className="mt-2 text-xs leading-5 text-[#93A0B5]">{item.explanation}</p>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <button type="button" onClick={() => setAnswers((value) => ({ ...value, [item.id]: { ...current, answer: "YES" } }))} className={`inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold ${current.answer === "YES" ? "bg-[#111111] text-[#F7F1E6]" : "border border-[#E7DBD8] text-[#3E1D2C]"}`}><Check className="size-4" /> I have this</button>
-                  <button type="button" onClick={() => setAnswers((value) => ({ ...value, [item.id]: { answer: "NO", promptText: "" } }))} className={`inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold ${current.answer === "NO" ? "bg-[#8D2948] text-white" : "border border-[#E7DBD8] text-[#3E1D2C]"}`}><X className="size-4" /> I do not</button>
+                  <button type="button" onClick={() => setAnswers((value) => ({ ...value, [item.id]: { ...current, answer: "YES" } }))} className={`inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold ${current.answer === "YES" ? "bg-[#05070D] text-[#F4F7FB]" : "border border-[#1C283C] text-[#F4F7FB]"}`}><Check className="size-4" /> I have this</button>
+                  <button type="button" onClick={() => setAnswers((value) => ({ ...value, [item.id]: { answer: "NO", promptText: "" } }))} className={`inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold ${current.answer === "NO" ? "kym-action text-white" : "border border-[#1C283C] text-[#F4F7FB]"}`}><X className="size-4" /> I do not</button>
                 </div>
                 {current.answer === "YES" && (
-                  <label className="mt-4 block text-sm font-semibold text-[#3E1D2C]">
+                  <label className="mt-4 block text-sm font-semibold text-[#F4F7FB]">
                     How did you do this?
-                    <textarea minLength={20} maxLength={2000} rows={4} value={current.promptText} onChange={(event) => setAnswers((value) => ({ ...value, [item.id]: { answer: "YES", promptText: event.target.value } }))} className="mt-2 w-full rounded-2xl border border-[#E7DBD8] p-3 text-sm font-normal leading-6 text-[#554850]" />
+                    <textarea minLength={20} maxLength={2000} rows={4} value={current.promptText} onChange={(event) => setAnswers((value) => ({ ...value, [item.id]: { answer: "YES", promptText: event.target.value } }))} className="mt-2 w-full rounded-2xl border border-[#1C283C] p-3 text-sm font-normal leading-6 text-[#93A0B5]" />
                   </label>
                 )}
               </article>
             );
-          }) : <p className="flex items-center gap-2 text-sm text-[#176B4C]"><CircleHelp className="size-4" />Nothing needs confirmation. Generate the targeted version.</p>}
+          }) : <p className="flex items-center gap-2 text-sm text-[#34D399]"><CircleHelp className="size-4" />Nothing needs confirmation. Generate the targeted version.</p>}
         </div>
         <div className="mt-6 flex flex-wrap gap-3">
-          <button type="button" onClick={() => void save()} disabled={Boolean(busy) || Boolean(remaining.length)} className="inline-flex min-h-12 items-center gap-2 rounded-full border border-[#111111] px-5 text-sm font-semibold text-[#111111] disabled:opacity-50">{busy === "save" ? <LoaderCircle className="size-4 animate-spin" /> : null} Save answers</button>
-          <button type="button" onClick={() => void generate()} disabled={Boolean(busy) || Boolean(remaining.length)} className="inline-flex min-h-12 items-center gap-2 rounded-full bg-[#111111] px-5 text-sm font-semibold text-[#F7F1E6] disabled:opacity-50">{busy === "generate" ? <LoaderCircle className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Write this resume</button>
+          <button type="button" onClick={() => void save()} disabled={Boolean(busy) || Boolean(remaining.length)} className="inline-flex min-h-12 items-center gap-2 rounded-full border border-[#1C283C] px-5 text-sm font-semibold text-[#F4F7FB] disabled:opacity-50">{busy === "save" ? <LoaderCircle className="size-4 animate-spin" /> : null} Save answers</button>
+          <button type="button" onClick={() => void generate()} disabled={Boolean(busy) || Boolean(remaining.length)} className="inline-flex min-h-12 items-center gap-2 rounded-full bg-[#05070D] px-5 text-sm font-semibold text-[#F4F7FB] disabled:opacity-50">{busy === "generate" ? <LoaderCircle className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Write this resume</button>
         </div>
-        {remaining.length > 0 && <p className="mt-3 text-xs text-[#70626A]">{remaining.length === 1 ? "1 unmatched requirement still needs your answer." : `${remaining.length} unmatched requirements still need your answer.`}</p>}
+        {remaining.length > 0 && <p className="mt-3 text-xs text-[#93A0B5]">{remaining.length === 1 ? "1 unmatched requirement still needs your answer." : `${remaining.length} unmatched requirements still need your answer.`}</p>}
       </section>
 
       {target.currentVersion && (
         <section>
           <div className="mb-4">
-            <p className="text-xs font-semibold uppercase tracking-[.18em] text-[#8A6A32]">Version {target.currentVersion.versionNumber}</p>
-            <h2 className="mt-1 text-2xl font-semibold text-[#3E1D2C]">Targeted resume</h2>
+            <p className="text-xs font-semibold uppercase tracking-[.18em] text-[#22D3EE]">Version {target.currentVersion.versionNumber}</p>
+            <h2 className="mt-1 text-2xl font-semibold text-[#F4F7FB]">Targeted resume</h2>
           </div>
           <ExpressiveResume content={target.currentVersion.content} />
         </section>

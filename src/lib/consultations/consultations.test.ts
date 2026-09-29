@@ -45,13 +45,19 @@ describe("consultation security and provider contract", () => {
     expect(parsedUrl.searchParams.get("email")).toBe("test@example.com");
     expect(parsedUrl.searchParams.get("metadata[consultationRequestId]")).toBe(id);
     expect(new URL(withCalEmbed(bookingUrl)).searchParams.get("embed")).toBe("true");
-    expect(readFileSync("src/app/page.tsx", "utf8")).toContain('redirect(owner?.user.email ? "/app" : "/consult")');
+    const homePage = readFileSync("src/app/page.tsx", "utf8");
+    const welcomePanel = readFileSync("src/components/landing/welcome-back-panel.tsx", "utf8");
+    expect(homePage).toContain("Book Your First Consultation");
+    expect(homePage).toContain("WelcomeBackPanel");
+    expect(welcomePanel).toContain("Welcome Back");
+    expect(homePage).toContain("Create Account");
+    expect(homePage).not.toContain('redirect(owner?.user.email ? "/app" : "/consult")');
     expect(existsSync("src/app/consult/page.tsx")).toBe(true);
     expect(existsSync("src/app/consult/book/[token]/page.tsx")).toBe(true);
     const consultPage = readFileSync("src/app/consult/page.tsx", "utf8");
     expect(consultPage).toContain("No account is required");
-    expect(consultPage).not.toContain("/client/register");
-    expect(consultPage).not.toContain("/client/sign-in");
+    expect(consultPage).toContain("/client/sign-in");
+    expect(consultPage).toContain("/client/register");
     expect(existsSync("src/app/api/consultations/sessions/route.ts")).toBe(true);
 
     const raw = JSON.stringify({ triggerEvent: "BOOKING_CREATED", createdAt: new Date().toISOString(), payload: { uid: "cal-booking-1", eventTypeId: 42, eventTitle: "Advisory Consultation", startTime: "2026-09-02T15:00:00.000Z", endTime: "2026-09-02T15:45:00.000Z", metadata: { consultationRequestId: id }, attendees: [{ name: "Test Client", email: "TEST@example.com", timeZone: "America/Chicago" }] } });

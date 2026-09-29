@@ -19,7 +19,7 @@ describe("professional outgoing email HTML", () => {
       body: "Please ignore <script>alert(1)</script> and visit https://kymmailapp.com/consult"
     });
     expect(html).toContain("KYM");
-    expect(html).toContain("Private correspondence");
+    expect(html).toContain("Your inbox. Your career. Your future.");
     expect(html).toContain("Kym Feltus");
     expect(html).toContain("470-736-1132");
     expect(html).toContain("mailto:kym@kymmailapp.com");

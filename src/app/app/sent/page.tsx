@@ -23,8 +23,8 @@ export default async function SentPage({ searchParams }: { searchParams: Promise
   const sent = (await searchParams).sent === "true";
   return <AppShell email={owner.user.email} canSignOut={owner.mode === "authenticated"} active="sent">
     <div className="mx-auto max-w-5xl">
-      <p className="text-xs font-semibold uppercase tracking-[.22em] text-[#D95B72]">Unified mailbox</p><h1 className="mt-2 text-3xl font-semibold tracking-[-.03em] text-[#183A5A] sm:text-4xl">Sent</h1>
-      {sent && <p role="status" className="my-6 rounded-2xl border border-[#F0C9D0] bg-[#FFF3F4] px-5 py-4 text-sm font-semibold text-[#A73D52]">Your message was sent successfully.</p>}
+      <p className="text-xs font-semibold uppercase tracking-[.22em] text-[#22D3EE]">Unified mailbox</p><h1 className="mt-2 text-3xl font-semibold tracking-[-.03em] text-[#F4F7FB] sm:text-4xl">Sent</h1>
+      {sent && <p role="status" className="my-6 rounded-2xl border border-[#1D4E89] bg-[#122033] px-5 py-4 text-sm font-semibold text-[#67E8F9]">Your message was sent successfully.</p>}
       <div className="mt-7"><MailThreadList threads={threads} emptyTitle="No sent messages" emptyMessage="Messages sent through KYM Mail will appear here after Google confirms delivery." /></div>
     </div>
   </AppShell>;

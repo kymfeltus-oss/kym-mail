@@ -24,7 +24,7 @@ export function DashboardViewSwitch({
   ];
 
   return (
-    <nav aria-label="Dashboard view" className="inline-flex w-full rounded-full border border-[#E8E2E3] bg-white p-1 shadow-[0_8px_24px_rgba(24,58,90,.05)] sm:w-auto">
+    <nav aria-label="Dashboard view" className="inline-flex w-full rounded-full border border-[#1C283C] bg-[#101828] p-1 shadow-[0_8px_24px_rgba(0,0,0,.05)] sm:w-auto">
       {options.map((option) => {
         const selected = view === option.id;
         return (
@@ -33,7 +33,7 @@ export function DashboardViewSwitch({
             href={href(option.id)}
             aria-current={selected ? "page" : undefined}
             title={option.hint}
-            className={`flex-1 rounded-full px-4 py-2.5 text-center text-sm font-semibold transition sm:flex-none sm:px-5 ${selected ? "bg-[#183A5A] text-white" : "text-[#526173] hover:bg-[#F8F5F4]"}`}
+            className={`flex-1 rounded-full px-4 py-2.5 text-center text-sm font-semibold transition sm:flex-none sm:px-5 ${selected ? "bg-[#0E1C33] text-white" : "text-[#93A0B5] hover:bg-[#05070D]"}`}
           >
             {option.label}
           </Link>

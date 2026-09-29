@@ -9,5 +9,5 @@ export function ClientSignOutButton() {
     router.push("/client/sign-in");
     router.refresh();
   }
-  return <button type="button" onClick={signOut} className="text-sm font-semibold text-[#526173]">Sign out</button>;
+  return <button type="button" onClick={signOut} className="text-sm font-semibold text-[#93A0B5]">Sign out</button>;
 }

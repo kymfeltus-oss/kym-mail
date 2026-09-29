@@ -16,7 +16,7 @@ function linkify(escaped: string, color: string, underline: string) {
 }
 
 export const emailLooks = [
-  { id: "personal", name: "Personal", company: null, description: "Private editorial stationery" },
+  { id: "personal", name: "Personal", company: null, description: "KYM Mail stationery" },
   { id: "snaptax", name: "SnapTax", company: "SnapTax", description: "SnapTax stationery" },
   { id: "securafin", name: "SecuraFin-AI", company: "SecuraFin-AI", description: "SecuraFin-AI stationery" },
   { id: "parable", name: "PARABLE", company: "PARABLE", description: "PARABLE stationery" },
@@ -42,21 +42,22 @@ export function defaultEmailLookForSender(from: string, label = "") {
 
 const looks = {
   personal: {
-    page: "#111111",
-    card: "#F6F1E8",
-    cardBorder: "#2A2A2A",
-    masthead: "#0B0B0B",
-    wordmark: "KYM",
-    wordmarkStyle: "margin:0;color:#F6F1E8;font-family:Didot,'Bodoni MT',Georgia,'Times New Roman',serif;font-size:28px;font-weight:400;letter-spacing:.42em",
-    kicker: "Private correspondence",
-    kickerStyle: "margin:10px 0 0;color:#C4A574;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:10px;letter-spacing:.38em;text-transform:uppercase",
-    rule: "#C4A574",
-    subjectStyle: "margin:0 0 28px;color:#0B0B0B;font-family:Didot,'Bodoni MT',Georgia,'Times New Roman',serif;font-size:22px;font-weight:400;letter-spacing:.01em;line-height:1.35",
-    body: "color:#1A1A1A;font-size:16px;line-height:1.75;font-family:Helvetica Neue,Helvetica,Arial,sans-serif",
-    link: "#6B1D2A",
-    linkLine: "#C4A574",
-    signName: "margin:0;color:#0B0B0B;font-family:Didot,'Bodoni MT',Georgia,'Times New Roman',serif;font-size:18px",
-    signMeta: "margin:6px 0 0;color:#6F675C;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:13px;line-height:1.55"
+    page: "#05070D",
+    card: "#F4F7FB",
+    cardBorder: "#1C283C",
+    masthead: "#070D18",
+    wordmark: "KYM MAIL",
+    wordmarkStyle: "margin:0;color:#F4F7FB;font-family:Montserrat,'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:20px;font-weight:700;letter-spacing:.28em",
+    kicker: "Your inbox. Your career. Your future.",
+    kickerStyle: "margin:10px 0 0;color:#22D3EE;font-family:Inter,'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:10px;letter-spacing:.22em;text-transform:uppercase",
+    rule: "#2563EB",
+    subjectStyle: "margin:0 0 28px;color:#0B1220;font-family:Montserrat,'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:22px;font-weight:600;letter-spacing:.01em;line-height:1.35",
+    body: "color:#1A2332;font-size:16px;line-height:1.75;font-family:Inter,'Helvetica Neue',Helvetica,Arial,sans-serif",
+    link: "#1D4ED8",
+    linkLine: "#93C5FD",
+    signName: "margin:0;color:#0B1220;font-family:Montserrat,'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:16px;font-weight:700",
+    signMeta: "margin:6px 0 0;color:#52657A;font-family:Inter,'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;line-height:1.55",
+    mastheadImage: "/brand/kym-mail-lockup.png"
   },
   snaptax: {
     page: "#F3F6F2",
@@ -171,6 +172,9 @@ export function buildProfessionalEmailHtml({
   const selected = look ?? defaultEmailLookForSender(from);
   const theme = looks[selected];
   const content = formatMessageHtml(body, selected) || `<p style="margin:0;${theme.body}">${escapeHtml(body)}</p>`;
+  const logoPath = "mastheadImage" in theme ? theme.mastheadImage : "";
+  const logoBase = process.env.APP_URL?.trim().replace(/\/$/, "") ?? "";
+  const logo = logoPath ? `<img src="${logoBase}${logoPath}" alt="KYM MAIL" width="220" style="display:block;margin:0 auto 16px;height:auto;border:0" />` : "";
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -185,6 +189,7 @@ export function buildProfessionalEmailHtml({
       <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width:600px;width:100%;background:${theme.card};border:1px solid ${theme.cardBorder}">
         <tr>
           <td style="background:${theme.masthead};padding:28px 36px 22px;text-align:center">
+            ${logo}
             <p style="${theme.wordmarkStyle}">${theme.wordmark}</p>
             <p style="${theme.kickerStyle}">${theme.kicker}</p>
           </td>
