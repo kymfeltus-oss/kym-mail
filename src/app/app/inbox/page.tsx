@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { GmailConnectionPanel } from "@/components/gmail-connection-panel";
-import { MailThreadList, type ThreadListItem } from "@/components/mail-thread-list";
+import { MailboxBrowser } from "@/components/mailbox-browser";
+import { withMessageParties } from "@/lib/mail/mailbox-query";
 import { getOwnerContext } from "@/lib/auth/owner-context";
 
 export const metadata = { title: "Inbox" };
@@ -18,7 +19,7 @@ export default async function InboxPage() {
   ] = await Promise.all([
     database.from("mail_accounts").select("id, email_address, label, is_default, is_active, send_as_state").eq("owner_id", user.id).order("is_default", { ascending: false }),
     database.from("mail_connections").select("id, provider_account_id, connection_state, initial_sync_completed_at, last_synced_at, sync_error").eq("owner_id", user.id).eq("provider", "google").maybeSingle(),
-    database.from("mail_messages").select("thread_id").eq("owner_id", user.id).eq("is_inbox", true).order("sent_at", { ascending: false }).limit(200)
+    database.from("mail_messages").select("thread_id, from_address, to_addresses").eq("owner_id", user.id).eq("is_inbox", true).order("sent_at", { ascending: false }).limit(200)
   ]);
   if (accountsError || connectionError || inboxError) throw new Error("INBOX_UNAVAILABLE");
 
@@ -29,7 +30,10 @@ export default async function InboxPage() {
     ? await database.from("mail_threads").select("id, mail_account_id, subject, snippet, last_message_at, is_unread, has_attachments").eq("owner_id", user.id).in("id", threadIds).order("last_message_at", { ascending: false })
     : { data: [], error: null };
   if (threadsError) throw new Error("INBOX_UNAVAILABLE");
-  const threads: ThreadListItem[] = (threadRows ?? []).map((thread) => ({ ...thread, identityEmail: accountEmails.get(thread.mail_account_id) ?? "KYM Mail" }));
+  const threads = withMessageParties(
+    (threadRows ?? []).map((thread) => ({ ...thread, identityEmail: accountEmails.get(thread.mail_account_id) ?? "KYM Mail" })),
+    inboxMessages ?? []
+  );
   const availableIdentityCount = accounts.filter((account) => account.send_as_state === "available").length;
 
   return <AppShell email={owner.user.email} canSignOut={owner.mode === "authenticated"} active="inbox">
@@ -40,7 +44,7 @@ export default async function InboxPage() {
       </div>
 
       <GmailConnectionPanel connection={connection ?? null} availableIdentityCount={availableIdentityCount} />
-      <MailThreadList threads={threads} emptyTitle="Your inbox is clear" emptyMessage="No messages for your verified KYM Mail identities have synchronized yet. New mail will appear here after Gmail receives it." />
+      <MailboxBrowser threads={threads} mailbox="inbox" emptyTitle="Your inbox is clear" emptyMessage="No messages for your verified KYM Mail identities have synchronized yet. New mail will appear here after Gmail receives it." />
     </div>
   </AppShell>;
 }

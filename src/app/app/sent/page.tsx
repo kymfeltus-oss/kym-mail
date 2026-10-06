@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
-import { MailThreadList, type ThreadListItem } from "@/components/mail-thread-list";
+import { MailboxBrowser } from "@/components/mailbox-browser";
+import { withMessageParties } from "@/lib/mail/mailbox-query";
 import { getOwnerContext } from "@/lib/auth/owner-context";
 
 export const metadata = { title: "Sent" };
@@ -10,7 +11,7 @@ export default async function SentPage({ searchParams }: { searchParams: Promise
   if (!owner?.user.email) redirect("/sign-in");
   const [{ data: accounts, error: accountsError }, { data: sentMessages, error: sentError }] = await Promise.all([
     owner.database.from("mail_accounts").select("id, email_address").eq("owner_id", owner.user.id),
-    owner.database.from("mail_messages").select("thread_id").eq("owner_id", owner.user.id).eq("is_sent", true).order("sent_at", { ascending: false }).limit(200)
+    owner.database.from("mail_messages").select("thread_id, from_address, to_addresses").eq("owner_id", owner.user.id).eq("is_sent", true).order("sent_at", { ascending: false }).limit(200)
   ]);
   if (accountsError || sentError) throw new Error("SENT_UNAVAILABLE");
   const accountEmails = new Map((accounts ?? []).map((account) => [account.id, account.email_address]));
@@ -19,13 +20,16 @@ export default async function SentPage({ searchParams }: { searchParams: Promise
     ? await owner.database.from("mail_threads").select("id, mail_account_id, subject, snippet, last_message_at, is_unread, has_attachments").eq("owner_id", owner.user.id).in("id", threadIds).order("last_message_at", { ascending: false })
     : { data: [], error: null };
   if (error) throw new Error("SENT_UNAVAILABLE");
-  const threads: ThreadListItem[] = (rows ?? []).map((thread) => ({ ...thread, identityEmail: accountEmails.get(thread.mail_account_id) ?? "KYM Mail" }));
+  const threads = withMessageParties(
+    (rows ?? []).map((thread) => ({ ...thread, identityEmail: accountEmails.get(thread.mail_account_id) ?? "KYM Mail" })),
+    sentMessages ?? []
+  );
   const sent = (await searchParams).sent === "true";
   return <AppShell email={owner.user.email} canSignOut={owner.mode === "authenticated"} active="sent">
     <div className="mx-auto max-w-5xl">
       <p className="text-xs font-semibold uppercase tracking-[.22em] text-[#22D3EE]">Unified mailbox</p><h1 className="mt-2 text-3xl font-semibold tracking-[-.03em] text-[#F4F7FB] sm:text-4xl">Sent</h1>
       {sent && <p role="status" className="my-6 rounded-2xl border border-[#1D4E89] bg-[#122033] px-5 py-4 text-sm font-semibold text-[#67E8F9]">Your message was sent successfully.</p>}
-      <div className="mt-7"><MailThreadList threads={threads} emptyTitle="No sent messages" emptyMessage="Messages sent through KYM Mail will appear here after Google confirms delivery." /></div>
+      <MailboxBrowser threads={threads} mailbox="sent" emptyTitle="No sent messages" emptyMessage="Messages sent through KYM Mail will appear here after Google confirms delivery." />
     </div>
   </AppShell>;
 }
