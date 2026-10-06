@@ -117,10 +117,14 @@ export function fillFollowUp(template: string, name: string) {
   return template.replaceAll("[Name]", name.trim() || "there").trim();
 }
 
-export function liveReplyAlert(name: string, company: string) {
-  const who = name.trim() || "a contact";
-  const where = company.trim() ? ` at ${company.trim()}` : "";
-  return `ALERT Live response received from ${who}${where}. Check your inbox immediately.`.slice(0, 320);
+export function liveReplyAlert() {
+  return "Live response received! Check your inbox immediately to review the reply.";
+}
+
+export function isDeliveryFailure(input: { from: string; subject: string; contentType?: string }) {
+  if (classifyInbound({ from: input.from, subject: input.subject, text: "" }) === "bounce") return true;
+  const contentType = input.contentType ?? "";
+  return /multipart\/report/i.test(contentType) && /report-type\s*=\s*delivery-status/i.test(contentType);
 }
 
 const bounceFrom = /^(mailer-daemon|postmaster|mail-daemon)@/i;

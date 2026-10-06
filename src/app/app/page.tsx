@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { AdminDashboard, type PendingProof, type UpcomingClientSession, type UpcomingConsultation } from "@/components/dashboard/admin-dashboard";
@@ -40,7 +41,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     { data: sessionRows, error: sessionError },
     { count: activeClients, error: clientsError },
     { data: settings, error: settingsError },
-    { data: connection, error: connectionError }
+    { data: connection, error: connectionError },
+    { count: undeliverableCount, error: undeliverableError }
   ] = await Promise.all([
     database.from("mail_threads").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("is_unread", true),
     database.from("projects").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("status", "ACTIVE"),
@@ -58,9 +60,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     database.from("client_session_bookings").select("id, client_id, guest_name, booking_title, booking_start_at").eq("owner_id", user.id).eq("status", "BOOKED").gte("booking_start_at", now).order("booking_start_at").limit(5),
     database.from("clients").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("is_active", true),
     database.from("consultation_settings").select("is_active, client_sessions_active, client_session_booking_url, zelle_recipient_name, zelle_contact, payment_instructions, reference_instructions").eq("owner_id", user.id).maybeSingle(),
-    database.from("mail_connections").select("provider_account_id, connection_state, initial_sync_completed_at, last_synced_at, sync_error").eq("owner_id", user.id).eq("provider", "google").maybeSingle()
+    database.from("mail_connections").select("provider_account_id, connection_state, initial_sync_completed_at, last_synced_at, sync_error").eq("owner_id", user.id).eq("provider", "google").maybeSingle(),
+    database.from("mail_messages").select("id", { count: "exact", head: true }).eq("owner_id", user.id).eq("is_undeliverable", true)
   ]);
-  if (unreadError || projectCountError || projectsError || threadsError || identitiesError || activityError || scheduledCountError || nextScheduledError || savedJobsCountError || recentJobsError || pendingConsultationsError || releasedError || upcomingConsultationsError || sessionError || clientsError || settingsError || connectionError) throw new Error("DASHBOARD_UNAVAILABLE");
+  if (unreadError || projectCountError || projectsError || threadsError || identitiesError || activityError || scheduledCountError || nextScheduledError || savedJobsCountError || recentJobsError || pendingConsultationsError || releasedError || upcomingConsultationsError || sessionError || clientsError || settingsError || connectionError || undeliverableError) throw new Error("DASHBOARD_UNAVAILABLE");
 
   const activityProjectIds = [...new Set((activity ?? []).map((item) => item.project_id))];
   const sessionClientIds = [...new Set((sessionRows ?? []).flatMap((item) => item.client_id ? [item.client_id] : []))];
@@ -95,6 +98,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     <AppShell email={owner.user.email} canSignOut={owner.mode === "authenticated"} active="dashboard">
       <div className="mx-auto max-w-6xl">
         <DashboardViewSwitch view={view} mailError={query.mailError} mailConnected={query.mailConnected} />
+        {(undeliverableCount ?? 0) > 0 && <Link href="/app/undeliverable" className="mt-8 block rounded-2xl border border-[#1D4E89] bg-[#122033] px-5 py-4 text-sm font-semibold text-[#67E8F9]">{undeliverableCount} undeliverable {undeliverableCount === 1 ? "message is" : "messages are"} waiting in the Undeliverable box.</Link>}
         <div className="mt-8">
           {view === "user" ? <UserBookingView settings={bookingSettings} /> : (
             <AdminDashboard

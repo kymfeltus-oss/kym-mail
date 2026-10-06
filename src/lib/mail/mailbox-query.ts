@@ -1,4 +1,4 @@
-export type Mailbox = "inbox" | "sent";
+export type Mailbox = "inbox" | "sent" | "undeliverable";
 
 export type ThreadListItem = {
   id: string;
@@ -41,7 +41,7 @@ export function withMessageParties(
 }
 
 export function threadCorrespondent(thread: ThreadListItem, mailbox: Mailbox) {
-  if (mailbox === "sent") return thread.toAddresses.filter(Boolean).join(", ") || thread.identityEmail;
+  if (mailbox === "sent" || mailbox === "undeliverable") return thread.toAddresses.filter(Boolean).join(", ") || thread.identityEmail;
   return thread.fromAddress || thread.identityEmail;
 }
 

@@ -1,13 +1,15 @@
 import Link from "next/link";
-import { BookOpenCheck, BriefcaseBusiness, CalendarClock, CalendarDays, FileUser, FolderKanban, Inbox, LayoutDashboard, LogOut, Send, SquarePen, Users } from "lucide-react";
+import { BookOpenCheck, BriefcaseBusiness, CalendarClock, CalendarDays, FileUser, FolderKanban, Inbox, LayoutDashboard, LogOut, MailWarning, Send, SquarePen, Users } from "lucide-react";
 import { signOut } from "@/app/sign-in/actions";
 import { BrandLockup } from "@/components/brand-lockup";
+import { getOwnerContext } from "@/lib/auth/owner-context";
 
-type ActiveView = "dashboard" | "inbox" | "sent" | "scheduled" | "calendar" | "clients" | "projects" | "jobs" | "career" | "resumes" | "compose";
+type ActiveView = "dashboard" | "inbox" | "sent" | "undeliverable" | "scheduled" | "calendar" | "clients" | "projects" | "jobs" | "career" | "resumes" | "compose";
 const navigation = [
   { href: "/app", label: "Home", desktopLabel: "Dashboard", icon: LayoutDashboard, active: "dashboard" as const },
   { href: "/app/inbox", label: "Inbox", desktopLabel: "Inbox", icon: Inbox, active: "inbox" as const },
   { href: "/app/sent", label: "Sent", desktopLabel: "Sent", icon: Send, active: "sent" as const },
+  { href: "/app/undeliverable", label: "Bounced", desktopLabel: "Undeliverable", icon: MailWarning, active: "undeliverable" as const },
   { href: "/app/scheduled", label: "Schedule", desktopLabel: "Scheduled", icon: CalendarClock, active: "scheduled" as const },
   { href: "/app/calendar", label: "Calendar", desktopLabel: "Calendar", icon: CalendarDays, active: "calendar" as const },
   { href: "/app/clients", label: "Clients", desktopLabel: "Clients", icon: Users, active: "clients" as const },
@@ -22,7 +24,12 @@ const itemClass = (selected: boolean) => selected
   ? "bg-[#10283A] text-[#F4F7FB] shadow-[inset_3px_0_0_#22D3EE]"
   : "text-[#93A0B5] hover:bg-white/5 hover:text-white";
 
-export function AppShell({ email, canSignOut, active = "dashboard", children }: { email: string; canSignOut: boolean; active?: ActiveView; children: React.ReactNode }) {
+export async function AppShell({ email, canSignOut, active = "dashboard", children }: { email: string; canSignOut: boolean; active?: ActiveView; children: React.ReactNode }) {
+  const owner = await getOwnerContext();
+  const { count } = owner
+    ? await owner.database.from("mail_messages").select("id", { count: "exact", head: true }).eq("owner_id", owner.user.id).eq("is_undeliverable", true)
+    : { count: 0 };
+  const undeliverableCount = count ?? 0;
   return <div className="min-h-screen lg:grid lg:grid-cols-[276px_1fr]">
     <aside className="border-b border-[#1C283C] bg-[#070D18] px-5 py-5 text-white lg:flex lg:min-h-screen lg:flex-col lg:border-b-0 lg:border-r lg:px-6 lg:py-7">
       <div className="flex items-center justify-between gap-4">
@@ -36,7 +43,8 @@ export function AppShell({ email, canSignOut, active = "dashboard", children }: 
         {navigation.map((item) => {
           const Icon = item.icon;
           const selected = active === item.active;
-          return <Link key={item.href} href={item.href} aria-current={selected ? "page" : undefined} className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition ${itemClass(selected)}`}><Icon className={`size-4 ${selected ? "text-[#22D3EE]" : ""}`} /> {item.desktopLabel}</Link>;
+          const badge = item.active === "undeliverable" && undeliverableCount > 0 ? undeliverableCount : 0;
+          return <Link key={item.href} href={item.href} aria-current={selected ? "page" : undefined} className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition ${itemClass(selected)}`}><Icon className={`size-4 ${selected ? "text-[#22D3EE]" : ""}`} /> <span className="min-w-0 flex-1">{item.desktopLabel}</span>{badge > 0 && <span className="rounded-full bg-[#2A1218] px-2 py-0.5 text-[10px] font-semibold text-[#F4B4C4]">{badge}</span>}</Link>;
         })}
       </nav>
       <div className="mt-auto hidden border-t border-[#1C283C] pt-5 lg:block"><p className="truncate text-sm text-[#C5D0E0]">{email}</p>{canSignOut && <form action={signOut}><button className="mt-3 flex items-center gap-2 text-sm text-[#93A0B5] transition hover:text-white"><LogOut className="size-4" /> Sign out</button></form>}</div>

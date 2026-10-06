@@ -31,6 +31,6 @@ describe("live reply classification", () => {
   it("names the sender in the text alert", () => {
     expect(nameFromEmail("alex.morgan@example.com")).toBe("Alex Morgan");
     expect(fillFollowUp("Hi [Name],", "Alex Morgan")).toBe("Hi Alex Morgan,");
-    expect(liveReplyAlert("Alex Morgan", "Northwind")).toBe("ALERT Live response received from Alex Morgan at Northwind. Check your inbox immediately.");
+    expect(liveReplyAlert()).toBe("Live response received! Check your inbox immediately to review the reply.");
   });
 });

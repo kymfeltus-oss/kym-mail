@@ -43,8 +43,29 @@ describe("Gmail message normalization", () => {
       textBody: "Hello Kym",
       isInbox: true,
       isUnread: true,
+      isUndeliverable: false,
       attachments: [{ providerAttachmentId: "attachment-1", filename: "role.pdf", sizeBytes: 1234 }]
     });
+  });
+
+  it("marks delivery failures as undeliverable", () => {
+    const normalized = normalizeGmailMessage({
+      id: "bounce-1",
+      threadId: "thread-bounce",
+      internalDate: "1700000000000",
+      labelIds: ["INBOX"],
+      payload: {
+        mimeType: "multipart/report",
+        headers: [
+          { name: "From", value: "Mail Delivery Subsystem <mailer-daemon@googlemail.com>" },
+          { name: "To", value: "kym@kymmailapp.com" },
+          { name: "Subject", value: "Mail delivery failed: returning message to sender" },
+          { name: "Content-Type", value: "multipart/report; report-type=delivery-status" }
+        ],
+        parts: [{ mimeType: "text/plain", body: { data: Buffer.from("The recipient address could not be reached.").toString("base64url") } }]
+      }
+    });
+    expect(normalized?.isUndeliverable).toBe(true);
   });
 });
 

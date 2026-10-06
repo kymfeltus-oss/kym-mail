@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CalendarClock, Paperclip, Send, X } from "lucide-react";
 import { readApiJson } from "@/lib/http/read-api-json";
 import { validateAttachmentFiles } from "@/lib/mail/attachment-validation";
+import { EmailBodyEditor } from "@/components/email-body-editor";
 import { buildProfessionalEmailHtml, defaultEmailLookForSender, emailLookChrome, emailLooks, isEmailLook, type EmailLook } from "@/lib/mail/professional-html";
 
 export type ComposeIdentity = { id: string; email_address: string; label: string; is_default: boolean };
@@ -70,6 +71,7 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setStatus("sending"); setError(null);
+    if (!body.trim()) { setStatus("error"); setError("Write a message before sending."); return; }
     if (!validateAttachmentFiles(files)) {
       setStatus("error"); setError("One or more attachments are unsupported or too large."); return;
     }
@@ -151,10 +153,10 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
       <label className="grid min-w-0 gap-2 text-sm font-semibold text-[#F4F7FB]">Subject
         <input name="subject" type="text" required maxLength={200} value={subject} onChange={(event) => setSubject(event.target.value)} className="w-full min-w-0 rounded-xl border border-[#1C283C] bg-[#101828] px-4 py-3 font-normal outline-none focus:border-[#22D3EE]" />
       </label>
-      <label className="grid min-w-0 gap-2 text-sm font-semibold text-[#F4F7FB]">Message
-        <textarea name="body" required rows={12} value={body} onChange={(event) => setBody(event.target.value)} placeholder="Write your message…" className="w-full min-w-0 resize-y rounded-xl border border-[#1C283C] bg-[#101828] px-4 py-3 font-normal leading-7 outline-none placeholder:text-[#93A0B5] focus:border-[#22D3EE]" />
-        <span className="font-normal text-[#93A0B5]">Blank lines become paragraphs. Lines that start with - become a list. The recipient receives this designed version.</span>
-      </label>
+      <div className="grid min-w-0 gap-2 text-sm font-semibold text-[#F4F7FB]">Message
+        <EmailBodyEditor value={body} onChange={setBody} />
+        <span className="font-normal text-[#93A0B5]">Pasted text becomes paragraphs with spacing. A blank line starts a new paragraph, and lines that start with - become a list.</span>
+      </div>
       <section aria-label="Recipient preview" className="border p-3" style={{ background: previewChrome.masthead, borderColor: previewChrome.masthead }}>
         <p className="px-2 text-[10px] font-semibold uppercase tracking-[.28em]" style={{ color: previewChrome.accent }}>Recipient preview</p>
         <iframe title="How the recipient will see this message" sandbox="" srcDoc={buildProfessionalEmailHtml({ from: from || "your verified sender", subject: subject || "Message preview", body: body || "Your message will appear here.", look })} className="mt-3 h-[520px] w-full border-0" style={{ background: previewChrome.page }} />

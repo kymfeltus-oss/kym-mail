@@ -6,7 +6,7 @@ import { MailThreadList, type ThreadListItem } from "@/components/mail-thread-li
 import { isMailSort, searchThreads, sortThreads, type Mailbox, type MailSort } from "@/lib/mail/mailbox-query";
 
 function sortLabels(mailbox: Mailbox): Record<MailSort, string> {
-  const person = mailbox === "sent" ? "Recipient" : "Sender";
+  const person = mailbox === "inbox" ? "Sender" : "Recipient";
   return {
     newest: "Newest",
     oldest: "Oldest",

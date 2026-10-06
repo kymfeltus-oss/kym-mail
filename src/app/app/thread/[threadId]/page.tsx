@@ -6,6 +6,7 @@ import { MessageActions } from "@/components/message-actions";
 import { getOwnerContext } from "@/lib/auth/owner-context";
 import { selectForwardableAttachments } from "@/lib/mail/attachment-validation";
 import { formatMailTimestamp } from "@/lib/mail/date-format";
+import { formatPlainEmail } from "@/lib/mail/paste-format";
 
 export const metadata = { title: "Thread" };
 
@@ -43,7 +44,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ threadI
         const forwardableAttachments = selectForwardableAttachments(messageAttachments.map((attachment) => ({ ...attachment, name: attachment.filename, size: Number(attachment.size_bytes), providerAttachmentId: attachment.provider_attachment_id })));
         return <article key={message.id} className="rounded-3xl border border-[#1C283C] bg-[#101828] p-5 shadow-[0_14px_40px_rgba(0,0,0,.06)] sm:p-7">
         <header className="flex flex-wrap items-start justify-between gap-3 border-b border-[#1C283C] pb-4"><div><p className="text-sm font-semibold text-[#F4F7FB]">From: {message.from_address}</p><p className="mt-1 text-xs text-[#93A0B5]">To: {message.to_addresses.join(", ") || "Undisclosed recipient"}</p>{message.cc_addresses.length > 0 && <p className="mt-1 text-xs text-[#93A0B5]">CC: {message.cc_addresses.join(", ")}</p>}<p className="mt-2 text-[11px] font-semibold uppercase tracking-[.1em] text-[#67E8F9]">{identityEmails.get(message.mail_account_id) ?? "KYM Mail"}</p></div><time className="text-xs text-[#93A0B5]" dateTime={message.sent_at}>{formatMailTimestamp(message.sent_at)}</time></header>
-        {message.sanitized_html_body ? <div className="email-content mt-5 text-sm leading-7 text-[#F4F7FB]" dangerouslySetInnerHTML={{ __html: message.sanitized_html_body }} /> : <p className="mt-5 whitespace-pre-wrap text-sm leading-7 text-[#F4F7FB]">{message.text_body || "This message has no displayable body."}</p>}
+        {message.sanitized_html_body ? <div className="email-content mt-5 text-sm leading-7 text-[#F4F7FB]" dangerouslySetInnerHTML={{ __html: message.sanitized_html_body }} /> : <div className="email-content mt-5 text-sm leading-7 text-[#F4F7FB]">{formatPlainEmail(message.text_body || "").split(/\n{2,}/).filter(Boolean).map((paragraph, index) => <p key={`${message.id}-${index}`}>{paragraph}</p>)}</div>}
         {messageAttachments.length > 0 && <ul className="mt-5 space-y-2 border-t border-[#1C283C] pt-4">{messageAttachments.map((attachment) => <li key={attachment.id}><a href={`/api/mail/attachments/${attachment.id}`} className="flex items-center gap-2 text-xs font-semibold text-[#67E8F9] hover:underline"><Paperclip className="size-3.5" /> {attachment.filename} · {(Number(attachment.size_bytes) / 1024).toFixed(1)} KB</a></li>)}</ul>}
         {identities?.length ? <MessageActions
           message={{

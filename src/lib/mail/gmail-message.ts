@@ -1,4 +1,5 @@
 import sanitizeHtml from "sanitize-html";
+import { isDeliveryFailure } from "@/lib/mail/follow-up";
 
 export type GmailHeader = { name: string; value: string };
 export type GmailMessagePart = {
@@ -38,6 +39,7 @@ export type NormalizedGmailMessage = {
   isSent: boolean;
   isDraft: boolean;
   isUnread: boolean;
+  isUndeliverable: boolean;
   attachments: Array<{
     providerAttachmentId: string;
     filename: string;
@@ -134,6 +136,11 @@ export function normalizeGmailMessage(message: GmailMessage): NormalizedGmailMes
     isSent: labelIds.has("SENT"),
     isDraft: labelIds.has("DRAFT"),
     isUnread: labelIds.has("UNREAD"),
+    isUndeliverable: isDeliveryFailure({
+      from: fromAddress,
+      subject: headerValue(headers, "Subject"),
+      contentType: headerValue(headers, "Content-Type")
+    }),
     attachments: collected.attachments
   };
 }

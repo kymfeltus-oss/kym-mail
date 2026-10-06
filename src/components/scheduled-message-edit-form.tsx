@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { EmailBodyEditor } from "@/components/email-body-editor";
 
 type Identity = { id: string; email_address: string; label: string };
 type Project = { id: string; name: string };
@@ -9,6 +10,7 @@ type Message = { id: string; mail_account_id: string; project_id: string | null;
 
 export function ScheduledMessageEditForm({ message, identities, projects, attachmentCount }: { message: Message; identities: Identity[]; projects: Project[]; attachmentCount: number }) {
   const router = useRouter();
+  const [body, setBody] = useState(message.text_body);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,7 +34,7 @@ export function ScheduledMessageEditForm({ message, identities, projects, attach
       <label className="grid gap-2 text-sm font-semibold text-[#F4F7FB]">To<input name="to" required defaultValue={message.to_addresses.join(", ")} className="rounded-xl border border-[#1C283C] bg-[#101828] px-4 py-3 font-normal" /></label>
       <div className="grid gap-4 sm:grid-cols-2"><label className="grid gap-2 text-sm font-semibold text-[#F4F7FB]">CC<input name="cc" defaultValue={message.cc_addresses.join(", ")} className="rounded-xl border border-[#1C283C] bg-[#101828] px-4 py-3 font-normal" /></label><label className="grid gap-2 text-sm font-semibold text-[#F4F7FB]">BCC<input name="bcc" defaultValue={message.bcc_addresses.join(", ")} className="rounded-xl border border-[#1C283C] bg-[#101828] px-4 py-3 font-normal" /></label></div>
       <label className="grid gap-2 text-sm font-semibold text-[#F4F7FB]">Subject<input name="subject" required maxLength={200} defaultValue={message.subject} className="rounded-xl border border-[#1C283C] bg-[#101828] px-4 py-3 font-normal" /></label>
-      <label className="grid gap-2 text-sm font-semibold text-[#F4F7FB]">Message<textarea name="body" required rows={12} defaultValue={message.text_body} className="resize-y rounded-xl border border-[#1C283C] bg-[#101828] px-4 py-3 font-normal leading-7" /></label>
+      <div className="grid gap-2 text-sm font-semibold text-[#F4F7FB]">Message<EmailBodyEditor value={body} onChange={setBody} /></div>
       {attachmentCount > 0 && <p className="rounded-2xl bg-[#122033] px-4 py-3 text-xs leading-5 text-[#93A0B5]">{attachmentCount} approved attachment{attachmentCount === 1 ? " is" : "s are"} retained unchanged for delivery.</p>}
     </div>
     {error && <p role="alert" className="mt-5 rounded-xl bg-[#122033] px-4 py-3 text-sm text-[#67E8F9]">{error}</p>}

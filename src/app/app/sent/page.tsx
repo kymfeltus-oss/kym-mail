@@ -10,13 +10,15 @@ export const metadata = { title: "Sent" };
 export default async function SentPage({ searchParams }: { searchParams: Promise<{ sent?: string }> }) {
   const owner = await getOwnerContext();
   if (!owner?.user.email) redirect("/sign-in");
-  const [{ data: accounts, error: accountsError }, { data: sentMessages, error: sentError }] = await Promise.all([
+  const [{ data: accounts, error: accountsError }, { data: sentMessages, error: sentError }, { data: bouncedMessages, error: bouncedError }] = await Promise.all([
     owner.database.from("mail_accounts").select("id, email_address").eq("owner_id", owner.user.id),
-    owner.database.from("mail_messages").select("thread_id, from_address, to_addresses").eq("owner_id", owner.user.id).eq("is_sent", true).order("sent_at", { ascending: false }).limit(200)
+    owner.database.from("mail_messages").select("thread_id, from_address, to_addresses").eq("owner_id", owner.user.id).eq("is_sent", true).eq("is_undeliverable", false).order("sent_at", { ascending: false }).limit(200),
+    owner.database.from("mail_messages").select("thread_id").eq("owner_id", owner.user.id).eq("is_undeliverable", true).limit(1000)
   ]);
-  if (accountsError || sentError) throw new Error("SENT_UNAVAILABLE");
+  if (accountsError || sentError || bouncedError) throw new Error("SENT_UNAVAILABLE");
   const accountEmails = new Map((accounts ?? []).map((account) => [account.id, account.email_address]));
-  const threadIds = [...new Set((sentMessages ?? []).map((message) => message.thread_id))];
+  const bouncedThreadIds = new Set((bouncedMessages ?? []).map((message) => message.thread_id));
+  const threadIds = [...new Set((sentMessages ?? []).map((message) => message.thread_id))].filter((threadId) => !bouncedThreadIds.has(threadId));
   const { data: rows, error } = threadIds.length
     ? await owner.database.from("mail_threads").select("id, mail_account_id, subject, snippet, last_message_at, is_unread, has_attachments").eq("owner_id", owner.user.id).in("id", threadIds).order("last_message_at", { ascending: false })
     : { data: [], error: null };

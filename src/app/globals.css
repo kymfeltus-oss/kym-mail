@@ -102,6 +102,14 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
   .kym-pointer-step:hover .kym-step-icon { transform: translateY(-3px); }
 }
 .email-content { overflow-wrap: anywhere; }
+.email-content p { margin: 0 0 1.15em; }
+.email-content p:last-child { margin-bottom: 0; }
+.email-content li { margin: 0 0 0.45em; }
+.email-composer { min-height: 18rem; border-radius: 0.75rem; border: 1px solid #1C283C; background: #101828; padding: 0.85rem 1rem; line-height: 1.75; color: #F4F7FB; }
+.email-composer:focus { outline: none; border-color: #22D3EE; }
+.email-composer p, .email-composer div { margin: 0 0 1em; }
+.email-composer p:last-child, .email-composer div:last-child { margin-bottom: 0; }
+.email-composer:empty:before { content: attr(data-placeholder); color: #93A0B5; }
 .email-content a { color: var(--kym-cyan); text-decoration: underline; }
 .email-content table { max-width: 100%; border-collapse: collapse; }
 .email-content blockquote { margin-left: 0; border-left: 3px solid #1d4e89; padding-left: 1rem; color: var(--kym-muted); }

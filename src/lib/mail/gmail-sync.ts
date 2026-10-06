@@ -124,6 +124,7 @@ async function persistMessage(database: SupabaseClient, connectionId: string, ow
     is_sent: message.isSent,
     is_draft: message.isDraft,
     is_unread: message.isUnread,
+    is_undeliverable: message.isUndeliverable,
     updated_at: new Date().toISOString()
   }, { onConflict: "mail_connection_id,provider_message_id" }).select("id").single();
   if (messageError || !persistedMessage) throw new AppError("INTERNAL", "The mailbox message could not be persisted.");
