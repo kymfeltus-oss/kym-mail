@@ -1,5 +1,5 @@
 import { AlignmentType, BorderStyle, Document, LevelFormat, Packer, Paragraph, ShadingType, Table, TableCell, TableRow, TextRun, WidthType } from "docx";
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
 import { formatResumeDate } from "@/lib/resumes/format";
 import type { TargetResumeContent } from "@/lib/resumes/target/types";
 

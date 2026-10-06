@@ -46,12 +46,16 @@ export function threadCorrespondent(thread: ThreadListItem, mailbox: Mailbox) {
 }
 
 type SearchTerm =
-  | { field: "any" | "from" | "to" | "subject"; value: string }
-  | { field: "unread" | "attachment" };
+  | { field: "any"; value: string }
+  | { field: "from"; value: string }
+  | { field: "to"; value: string }
+  | { field: "subject"; value: string }
+  | { field: "unread" }
+  | { field: "attachment" };
 
 function parseSearch(query: string): SearchTerm[] {
   const tokens = query.match(/"[^"]+"|\S+/g) ?? [];
-  return tokens.flatMap((token) => {
+  return tokens.flatMap((token): SearchTerm[] => {
     const bare = token.replaceAll('"', "").trim();
     if (!bare) return [];
     const operator = /^(from|to|subject|is|has):(.*)$/i.exec(bare);
