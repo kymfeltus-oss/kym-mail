@@ -19,6 +19,15 @@ const schedulerEnvSchema = z.object({
   CRON_SECRET: z.string().min(32)
 });
 
+const e164Phone = z.string().trim().regex(/^\+[1-9]\d{9,14}$/);
+
+const twilioEnvSchema = z.object({
+  TWILIO_ACCOUNT_SID: z.string().trim().min(10),
+  TWILIO_AUTH_TOKEN: z.string().trim().min(16),
+  TWILIO_FROM_NUMBER: e164Phone,
+  OWNER_ALERT_PHONE: e164Phone
+});
+
 const jobSearchEnvSchema = z.object({
   ADZUNA_APP_ID: z.string().trim().min(2),
   ADZUNA_APP_KEY: z.string().trim().min(8)
@@ -81,6 +90,16 @@ export function getSupabaseAdminEnv(input: Record<string, string | undefined> = 
 export function getSchedulerEnv(input: Record<string, string | undefined> = process.env) {
   const result = schedulerEnvSchema.safeParse(input);
   if (!result.success) throw new ConfigurationError("Scheduled delivery is not configured.");
+  return result.data;
+}
+
+export function hasTwilioEnv(input: Record<string, string | undefined> = process.env) {
+  return twilioEnvSchema.safeParse(input).success;
+}
+
+export function getTwilioEnv(input: Record<string, string | undefined> = process.env) {
+  const result = twilioEnvSchema.safeParse(input);
+  if (!result.success) throw new ConfigurationError("Text alerts are not configured.");
   return result.data;
 }
 

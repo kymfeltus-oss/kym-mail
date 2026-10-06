@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { AppError, toSafeError } from "@/lib/errors";
 import { log } from "@/lib/logger";
 import { loadGoogleProvider, syncGmailMessageById } from "@/lib/mail/gmail-sync";
+import { advanceOutreachAfterSend, guardOutreachSend } from "@/lib/mail/outreach";
 import { scheduledAttachmentBucket } from "@/lib/scheduling/constants";
 
 type ScheduledRecord = {
@@ -21,6 +22,8 @@ type ScheduledRecord = {
   processing_token: string;
   attempt_count: number;
   max_attempts: number;
+  outreach_sequence_id?: string | null;
+  outreach_touch?: number | null;
 };
 
 type ExecutionSummary = { claimed: number; sent: number; retried: number; failed: number; reconciled: number };
@@ -108,6 +111,19 @@ async function markSent(database: SupabaseClient, record: ScheduledRecord, resul
   if (error || !data) throw new AppError("CONFLICT", "Scheduled delivery was already finalized.");
 }
 
+async function markCancelled(database: SupabaseClient, record: ScheduledRecord) {
+  const now = new Date().toISOString();
+  await database.from("scheduled_messages").update({
+    status: "CANCELLED",
+    cancelled_at: now,
+    processing_token: null,
+    claimed_at: null,
+    last_error_code: "OUTREACH_STOPPED",
+    last_error_message: "The follow-up was stopped because the recipient replied, bounced, or was marked do not contact.",
+    updated_at: now
+  }).eq("id", record.id).eq("status", "PROCESSING").eq("processing_token", record.processing_token);
+}
+
 async function markFailure(database: SupabaseClient, record: ScheduledRecord, error: unknown) {
   const decision = scheduledFailureDecision(error, record.attempt_count, record.max_attempts);
   const now = new Date();
@@ -159,6 +175,10 @@ export async function executeDueScheduledMessages(database: SupabaseClient): Pro
 
   for (const record of records) {
     try {
+      if ((await guardOutreachSend(database, record.outreach_sequence_id)) === "cancel") {
+        await markCancelled(database, record);
+        continue;
+      }
       const identity = await currentIdentity(database, record);
       const { provider } = await loadGoogleProvider(database, identity.mail_connection_id);
       const existing = await provider.listMessageIds(`rfc822msgid:${record.rfc_message_id}`, 1);
@@ -183,6 +203,12 @@ export async function executeDueScheduledMessages(database: SupabaseClient): Pro
       try { sentMessageId = await synchronizedMessageId(database, record, identity.mail_connection_id, result.messageId); }
       catch { /* Delivery succeeded; reconciliation is retried separately without another send. */ }
       await markSent(database, record, result, sentMessageId);
+      await advanceOutreachAfterSend(database, {
+        sequenceId: record.outreach_sequence_id,
+        touch: record.outreach_touch,
+        rfcMessageId: record.rfc_message_id,
+        providerThreadId: result.threadId
+      });
       summary.sent += 1;
     } catch (error) {
       const retried = await markFailure(database, record, error);

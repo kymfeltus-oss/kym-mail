@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { GoogleMailProvider } from "@/integrations/google/google-mail-provider";
 import { getGoogleMailEnv } from "@/lib/env";
-import { AppError } from "@/lib/errors";
+import { AppError, toSafeError } from "@/lib/errors";
 import { log } from "@/lib/logger";
 import { isRecoverableGmailHistoryError, providerStatus } from "@/lib/mail/google-api-error";
 import { normalizeGmailMessage, type GmailMessage, type NormalizedGmailMessage } from "@/lib/mail/gmail-message";
@@ -173,6 +173,14 @@ async function persistMessage(database: SupabaseClient, connectionId: string, ow
   };
   const { error: threadUpdateError } = await database.from("mail_threads").update(threadUpdate).eq("id", threadId);
   if (threadUpdateError) throw new AppError("INTERNAL", "The mailbox thread could not be updated.");
+  if (!message.isSent && threadId) {
+    try {
+      const { stopOutreachForInbound } = await import("@/lib/mail/outreach");
+      await stopOutreachForInbound(database, { threadId, from: message.fromAddress, subject: message.subject, text: message.textBody ?? "" });
+    } catch (error) {
+      log("error", "mail.outreach_inbound_failed", { code: toSafeError(error).code });
+    }
+  }
 }
 
 export async function syncGmailConnection(database: SupabaseClient, connectionId: string, requestedMode: SyncMode = "incremental"): Promise<GmailSyncResult> {

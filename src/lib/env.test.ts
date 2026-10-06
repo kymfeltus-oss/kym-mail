@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getContactProviderEnv, getJobSearchEnv, getSchedulerEnv, hasContactProviderEnv, isDevAuthBypassEnabled, parsePublicEnv } from "./env";
+import { getContactProviderEnv, getJobSearchEnv, getSchedulerEnv, getTwilioEnv, hasContactProviderEnv, hasTwilioEnv, isDevAuthBypassEnabled, parsePublicEnv } from "./env";
 import { ConfigurationError } from "./errors";
 describe("environment validation", () => {
   it("accepts complete public configuration", () => expect(parsePublicEnv({ NEXT_PUBLIC_SUPABASE_URL: "https://project.supabase.co", NEXT_PUBLIC_SUPABASE_ANON_KEY: "a".repeat(20) }).NEXT_PUBLIC_SUPABASE_URL).toContain("supabase.co"));
@@ -14,6 +14,14 @@ describe("scheduler environment", () => {
   it("requires a server-only high-entropy cron secret", () => {
     expect(getSchedulerEnv({ CRON_SECRET: "s".repeat(32) }).CRON_SECRET).toHaveLength(32);
     expect(() => getSchedulerEnv({ CRON_SECRET: "short" })).toThrow(ConfigurationError);
+  });
+});
+describe("text alert environment", () => {
+  const twilio = { TWILIO_ACCOUNT_SID: "AC1234567890", TWILIO_AUTH_TOKEN: "a".repeat(16), TWILIO_FROM_NUMBER: "+15555550100", OWNER_ALERT_PHONE: "+15555550199" };
+  it("stays off until both phone numbers and the token are present", () => {
+    expect(hasTwilioEnv({})).toBe(false);
+    expect(hasTwilioEnv(twilio)).toBe(true);
+    expect(getTwilioEnv(twilio).OWNER_ALERT_PHONE).toBe("+15555550199");
   });
 });
 describe("Job Search environment", () => {

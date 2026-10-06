@@ -3,6 +3,7 @@ import { AppShell } from "@/components/app-shell";
 import { MailboxBrowser } from "@/components/mailbox-browser";
 import { withMessageParties } from "@/lib/mail/mailbox-query";
 import { getOwnerContext } from "@/lib/auth/owner-context";
+import { hasTwilioEnv } from "@/lib/env";
 
 export const metadata = { title: "Sent" };
 
@@ -29,7 +30,8 @@ export default async function SentPage({ searchParams }: { searchParams: Promise
     <div className="mx-auto max-w-5xl">
       <p className="text-xs font-semibold uppercase tracking-[.22em] text-[#22D3EE]">Unified mailbox</p><h1 className="mt-2 text-3xl font-semibold tracking-[-.03em] text-[#F4F7FB] sm:text-4xl">Sent</h1>
       {sent && <p role="status" className="my-6 rounded-2xl border border-[#1D4E89] bg-[#122033] px-5 py-4 text-sm font-semibold text-[#67E8F9]">Your message was sent successfully.</p>}
-      <MailboxBrowser threads={threads} mailbox="sent" emptyTitle="No sent messages" emptyMessage="Messages sent through KYM Mail will appear here after Google confirms delivery." />
+      <p className="mt-3 max-w-2xl text-sm leading-6 text-[#93A0B5]">Select sent conversations to start a three-touch follow-up. A live reply texts you and stops the sequence.</p>
+      <MailboxBrowser threads={threads} mailbox="sent" smsConfigured={hasTwilioEnv()} emptyTitle="No sent messages" emptyMessage="Messages sent through KYM Mail will appear here after Google confirms delivery." />
     </div>
   </AppShell>;
 }
