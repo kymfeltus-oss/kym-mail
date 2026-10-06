@@ -111,21 +111,22 @@ const looks = {
     signMeta: "margin:6px 0 0;color:#7A6458;font-family:Georgia,'Times New Roman',serif;font-size:13px;line-height:1.55"
   },
   mass: {
-    page: "#EDE8DF",
-    card: "#FFFFFF",
-    cardBorder: "#C8BFAE",
-    masthead: "#2C2A26",
+    page: "#030B16",
+    card: "#071423",
+    cardBorder: "#184C7B",
+    masthead: "#030B16",
     wordmark: "MASS DEVELOPMENT GROUP",
-    wordmarkStyle: "margin:0;color:#F4EFE4;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:13px;font-weight:600;letter-spacing:.22em",
-    kicker: "Development correspondence",
-    kickerStyle: "margin:10px 0 0;color:#C4A574;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:10px;letter-spacing:.26em;text-transform:uppercase",
-    rule: "#8A7348",
-    subjectStyle: "margin:0 0 24px;color:#2C2A26;font-family:Georgia,'Times New Roman',serif;font-size:20px;font-weight:400;line-height:1.4",
-    body: "color:#2C2A26;font-size:16px;line-height:1.7;font-family:Helvetica Neue,Helvetica,Arial,sans-serif",
-    link: "#6B5728",
-    linkLine: "#8A7348",
-    signName: "margin:0;color:#2C2A26;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:16px;font-weight:700",
-    signMeta: "margin:6px 0 0;color:#6B655C;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:13px;line-height:1.55"
+    wordmarkStyle: "margin:0;color:#F3F8FE;font-family:Montserrat,'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:11px;font-weight:600;letter-spacing:.28em",
+    productHtml: `<p style="margin:14px 0 0;font-family:Montserrat,'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:28px;font-weight:700;letter-spacing:-.03em;line-height:1"><span style="color:#F3F8FE">Data</span><span style="color:#00B0F8">Merge</span></p>`,
+    kicker: "Unify. Transform. Deliver.",
+    kickerStyle: "margin:12px 0 0;color:#E8B848;font-family:Montserrat,'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:10px;font-weight:600;letter-spacing:.28em;text-transform:uppercase",
+    rule: "#E8B848",
+    subjectStyle: "margin:0 0 24px;color:#F3F8FE;font-family:Montserrat,'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:22px;font-weight:600;letter-spacing:.01em;line-height:1.35",
+    body: "color:#F3F8FE;font-size:16px;line-height:1.7;font-family:Inter,'Helvetica Neue',Helvetica,Arial,sans-serif",
+    link: "#00B0F8",
+    linkLine: "#00B0F8",
+    signName: "margin:0;color:#F3F8FE;font-family:Montserrat,'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:16px;font-weight:700",
+    signMeta: "margin:6px 0 0;color:#B7C4D4;font-family:Inter,'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;line-height:1.55"
   }
 } as const;
 
@@ -191,6 +192,7 @@ export function buildProfessionalEmailHtml({
           <td style="background:${theme.masthead};padding:28px 36px 22px;text-align:center">
             ${logo}
             <p style="${theme.wordmarkStyle}">${theme.wordmark}</p>
+            ${"productHtml" in theme ? theme.productHtml : ""}
             <p style="${theme.kickerStyle}">${theme.kicker}</p>
           </td>
         </tr>

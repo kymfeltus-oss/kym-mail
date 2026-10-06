@@ -48,6 +48,19 @@ describe("professional outgoing email HTML", () => {
       expect(html).toContain("470-736-1132");
       expect(html).toContain("The packet is ready.");
     }
+    const mass = buildProfessionalEmailHtml({
+      from: "info@kymmailapp.com",
+      subject: "Project update",
+      body: "The packet is ready.",
+      look: "mass"
+    });
+    expect(mass).toContain("#030B16");
+    expect(mass).toContain("#E8B848");
+    expect(mass).toContain("#00B0F8");
+    expect(mass).toContain("Data");
+    expect(mass).toContain("Merge");
+    expect(mass).toContain("Unify. Transform. Deliver.");
+    expect(mass).not.toContain("Development correspondence");
     expect(emailLooks.map((look) => look.id)).toEqual(["personal", "snaptax", "securafin", "parable", "mass"]);
   });
 });
