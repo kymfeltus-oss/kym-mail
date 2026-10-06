@@ -22,6 +22,9 @@ const profileSchema = z.object({
   location_text: nullableText(2, 200).optional(),
   professional_summary: requiredText(20, 3000).optional(),
   years_experience_claim: z.union([z.string().regex(/^[0-9]{1,2}\+$/), z.literal("").transform(() => null), z.null()]).optional(),
+  email: z.union([z.string().trim().email().max(254), z.literal("").transform(() => null), z.null()]).optional(),
+  phone: z.union([z.string().trim().regex(/^[0-9+(). -]{7,40}$/), z.literal("").transform(() => null), z.null()]).optional(),
+  linkedin_url: z.union([z.string().trim().url().max(300), z.literal("").transform(() => null), z.null()]).optional(),
   authority_status: authority
 }).strict();
 

@@ -36,7 +36,7 @@ export function validateTargetResume(
 ): TargetResumeContent {
   const content = targetResumeContentSchema.parse(contentInput);
   const errors: string[] = [];
-  if (content.candidate.fullName !== career.profile.fullName || content.candidate.headline !== career.profile.headline || content.candidate.location !== career.profile.location) {
+  if (content.candidate.fullName !== career.profile.fullName || content.candidate.headline !== career.profile.headline || content.candidate.location !== career.profile.location || (content.candidate.email ?? null) !== career.profile.email || (content.candidate.phone ?? null) !== career.profile.phone || (content.candidate.linkedin ?? null) !== career.profile.linkedin) {
     errors.push("Candidate identity must match the Career Profile.");
   }
   if (content.target.jobTitle !== job.title || content.target.employer !== job.employer) errors.push("Target role must match the job description you dropped in.");

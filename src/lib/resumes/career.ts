@@ -4,7 +4,7 @@ import type { CareerEntityType } from "@/lib/resumes/types";
 
 export type CareerFact = { type: CareerEntityType; id: string; label: string; text: string };
 export type CareerFacts = {
-  profile: { ownerId: string; fullName: string; headline: string; location: string | null; summary: string; years: string | null };
+  profile: { ownerId: string; fullName: string; headline: string; location: string | null; summary: string; years: string | null; email: string | null; phone: string | null; linkedin: string | null };
   organizations: Array<{ id: string; name: string }>;
   titles: Array<{ id: string; name: string }>;
   experiences: Array<{ id: string; organizationId: string; clientOrganizationId: string | null; titleId: string | null; startDate: string | null; startPrecision: "MONTH" | "YEAR" | "UNKNOWN"; endDate: string | null; endPrecision: "MONTH" | "YEAR" | "UNKNOWN"; isCurrent: boolean; location: string | null; summary: string | null; completeness: "COMPLETE" | "PARTIAL" }>;
@@ -30,7 +30,7 @@ function metricText(row: Record<string, unknown>) {
 export async function loadCareerFacts(database: SupabaseClient, ownerId: string): Promise<CareerFacts> {
   const confirmedAuthority = ["AUTHORITATIVE", "RESOLVED"];
   const queries = await Promise.all([
-    database.from("career_profiles").select("owner_id, full_name, professional_headline, location_text, professional_summary, years_experience_claim").eq("owner_id", ownerId).in("authority_status", confirmedAuthority).single(),
+    database.from("career_profiles").select("owner_id, full_name, professional_headline, location_text, professional_summary, years_experience_claim, email, phone, linkedin_url").eq("owner_id", ownerId).in("authority_status", confirmedAuthority).single(),
     database.from("career_organizations").select("id, canonical_name").eq("owner_id", ownerId).in("authority_status", confirmedAuthority),
     database.from("career_titles").select("id, canonical_name").eq("owner_id", ownerId).in("authority_status", confirmedAuthority),
     database.from("career_experiences").select("id, organization_id, client_organization_id, title_id, start_date, start_precision, end_date, end_precision, is_current, location_text, summary, completeness").eq("owner_id", ownerId).in("authority_status", confirmedAuthority).order("start_date", { ascending: false, nullsFirst: false }),
@@ -55,7 +55,7 @@ export async function loadCareerFacts(database: SupabaseClient, ownerId: string)
   const accomplishments = ((queries[8].data ?? []) as Array<Record<string, unknown>>).map((row) => ({ id: String(row.id), experienceId: row.experience_id ? String(row.experience_id) : null, projectId: row.project_id ? String(row.project_id) : null, statement: String(row.statement) }));
   const metrics = ((queries[9].data ?? []) as Array<Record<string, unknown>>).map((row) => ({ id: String(row.id), accomplishmentId: String(row.accomplishment_id), sourceText: metricText(row) }));
   const aliases = ((queries[10].data ?? []) as Array<Record<string, unknown>>).map((row) => ({ type: row.entity_type as CareerEntityType, entityId: String(row.entity_id), alias: String(row.alias_text) }));
-  const profile = { ownerId: String(p.owner_id), fullName: String(p.full_name), headline: String(p.professional_headline), location: p.location_text ? String(p.location_text) : null, summary: String(p.professional_summary), years: p.years_experience_claim ? String(p.years_experience_claim) : null };
+  const profile = { ownerId: String(p.owner_id), fullName: String(p.full_name), headline: String(p.professional_headline), location: p.location_text ? String(p.location_text) : null, summary: String(p.professional_summary), years: p.years_experience_claim ? String(p.years_experience_claim) : null, email: p.email ? String(p.email) : null, phone: p.phone ? String(p.phone) : null, linkedin: p.linkedin_url ? String(p.linkedin_url) : null };
   const facts: CareerFact[] = [
     { type: "PROFILE", id: ownerId, label: profile.fullName, text: `${profile.headline}. ${profile.summary}` },
     ...organizations.map((item) => ({ type: "ORGANIZATION" as const, id: item.id, label: item.name, text: item.name })),

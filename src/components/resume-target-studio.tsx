@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, CircleHelp, LoaderCircle, Sparkles, X } from "lucide-react";
-import { ExpressiveResume } from "@/components/expressive-resume";
+import { ResumeLayoutGallery } from "@/components/resume-layout-gallery";
+import { ResumeProjectEditor, type ResumeProjectChoice } from "@/components/resume-project-editor";
 import { ResumeTargetIntelligencePanel } from "@/components/resume-target-intelligence";
 import { readApiJson } from "@/lib/http/read-api-json";
 import type { TargetResumeView } from "@/lib/resumes/target/types";
@@ -17,7 +18,7 @@ const stateLabel: Record<TargetResumeView["requirements"][number]["matchState"],
   NOT_APPLICABLE: "Not applicable"
 };
 
-export function ResumeTargetStudio({ target }: { target: TargetResumeView }) {
+export function ResumeTargetStudio({ target, projectCatalog = [] }: { target: TargetResumeView; projectCatalog?: ResumeProjectChoice[] }) {
   const router = useRouter();
   const pending = useMemo(() => target.requirements.filter((item) => item.needsConfirmation), [target.requirements]);
   const matched = useMemo(() => target.requirements.filter((item) => item.matchState === "STRONG_MATCH" || item.matchState === "MATCH"), [target.requirements]);
@@ -28,13 +29,13 @@ export function ResumeTargetStudio({ target }: { target: TargetResumeView }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const remaining = pending.filter((item) => !answers[item.id]?.answer || (answers[item.id]?.answer === "YES" && answers[item.id].promptText.trim().length < 20));
+  const remaining = pending.filter((item) => answers[item.id]?.answer !== "YES" && answers[item.id]?.answer !== "NO");
 
   async function saveConfirmations() {
     const confirmations = pending.map((item) => ({
       requirementId: item.id,
       answer: answers[item.id]?.answer,
-      promptText: answers[item.id]?.answer === "YES" ? answers[item.id].promptText.trim() : ""
+      promptText: ""
     }));
     if (confirmations.some((item) => item.answer !== "YES" && item.answer !== "NO")) throw new Error("Confirm whether you have each unmatched requirement.");
     const response = await fetch(`/api/resumes/targets/${target.id}/confirmations`, {
@@ -98,8 +99,8 @@ export function ResumeTargetStudio({ target }: { target: TargetResumeView }) {
 
       <section className="rounded-[2rem] border border-[#1C283C] bg-[#101828] p-5 sm:p-7">
         <p className="text-xs font-semibold uppercase tracking-[.18em] text-[#22D3EE]">Your call</p>
-        <h2 className="mt-2 text-2xl font-semibold text-[#F4F7FB]">Do you have this experience?</h2>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-[#93A0B5]">If yes, write the experience in your own words. That prompt becomes part of this resume. If no, it stays off the page.</p>
+        <h2 className="mt-2 text-2xl font-semibold text-[#F4F7FB]">Mandatory qualifications</h2>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-[#93A0B5]">Only required qualifications that your accounting career does not already cover are listed here. Operations and corporate accounting are assumed from your roles. Your answer stays off the résumé.</p>
         <div className="mt-6 space-y-4">
           {pending.length ? pending.map((item) => {
             const current = answers[item.id] ?? { answer: "", promptText: "" };
@@ -112,12 +113,6 @@ export function ResumeTargetStudio({ target }: { target: TargetResumeView }) {
                   <button type="button" onClick={() => setAnswers((value) => ({ ...value, [item.id]: { ...current, answer: "YES" } }))} className={`inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold ${current.answer === "YES" ? "bg-[#05070D] text-[#F4F7FB]" : "border border-[#1C283C] text-[#F4F7FB]"}`}><Check className="size-4" /> I have this</button>
                   <button type="button" onClick={() => setAnswers((value) => ({ ...value, [item.id]: { answer: "NO", promptText: "" } }))} className={`inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold ${current.answer === "NO" ? "kym-action text-white" : "border border-[#1C283C] text-[#F4F7FB]"}`}><X className="size-4" /> I do not</button>
                 </div>
-                {current.answer === "YES" && (
-                  <label className="mt-4 block text-sm font-semibold text-[#F4F7FB]">
-                    How did you do this?
-                    <textarea minLength={20} maxLength={2000} rows={4} value={current.promptText} onChange={(event) => setAnswers((value) => ({ ...value, [item.id]: { answer: "YES", promptText: event.target.value } }))} className="mt-2 w-full rounded-2xl border border-[#1C283C] p-3 text-sm font-normal leading-6 text-[#93A0B5]" />
-                  </label>
-                )}
               </article>
             );
           }) : <p className="flex items-center gap-2 text-sm text-[#34D399]"><CircleHelp className="size-4" />Nothing needs confirmation. Generate the targeted version.</p>}
@@ -126,7 +121,7 @@ export function ResumeTargetStudio({ target }: { target: TargetResumeView }) {
           <button type="button" onClick={() => void save()} disabled={Boolean(busy) || Boolean(remaining.length)} className="inline-flex min-h-12 items-center gap-2 rounded-full border border-[#1C283C] px-5 text-sm font-semibold text-[#F4F7FB] disabled:opacity-50">{busy === "save" ? <LoaderCircle className="size-4 animate-spin" /> : null} Save answers</button>
           <button type="button" onClick={() => void generate()} disabled={Boolean(busy) || Boolean(remaining.length)} className="inline-flex min-h-12 items-center gap-2 rounded-full bg-[#05070D] px-5 text-sm font-semibold text-[#F4F7FB] disabled:opacity-50">{busy === "generate" ? <LoaderCircle className="size-4 animate-spin" /> : <Sparkles className="size-4" />} Write this resume</button>
         </div>
-        {remaining.length > 0 && <p className="mt-3 text-xs text-[#93A0B5]">{remaining.length === 1 ? "1 unmatched requirement still needs your answer." : `${remaining.length} unmatched requirements still need your answer.`}</p>}
+        {remaining.length > 0 && <p className="mt-3 text-xs text-[#93A0B5]">{remaining.length === 1 ? "1 mandatory qualification still needs your answer." : `${remaining.length} mandatory qualifications still need your answer.`}</p>}
       </section>
 
       {target.currentVersion && (
@@ -134,8 +129,10 @@ export function ResumeTargetStudio({ target }: { target: TargetResumeView }) {
           <div className="mb-4">
             <p className="text-xs font-semibold uppercase tracking-[.18em] text-[#22D3EE]">Version {target.currentVersion.versionNumber}</p>
             <h2 className="mt-1 text-2xl font-semibold text-[#F4F7FB]">Targeted resume</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#93A0B5]">Same content. Switch the layout, color, type, and header.</p>
           </div>
-          <ExpressiveResume content={target.currentVersion.content} />
+          <ResumeProjectEditor targetId={target.id} projects={target.currentVersion.content.projects} catalog={projectCatalog} />
+          <ResumeLayoutGallery content={target.currentVersion.content} targetId={target.id} />
         </section>
       )}
     </div>

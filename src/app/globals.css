@@ -35,6 +35,28 @@ body {
   font-family: var(--font-inter), Inter, sans-serif;
 }
 h1, h2, h3, h4, button, nav, label, legend { font-family: var(--font-montserrat), Montserrat, sans-serif; }
+.resume-paper {
+  color: var(--resume-ink);
+  background: var(--resume-paper);
+  font-family: var(--resume-body), Inter, sans-serif;
+}
+.resume-paper h1,
+.resume-paper h2,
+.resume-paper h3 {
+  font-family: var(--resume-heading-font), Georgia, serif;
+  color: var(--resume-heading);
+}
+.resume-paper .resume-muted { color: var(--resume-muted); }
+.resume-paper .resume-rule { border-color: var(--resume-accent); }
+.resume-paper .resume-band { background: var(--resume-accent); color: var(--resume-band-text); }
+.resume-paper .resume-band h1,
+.resume-paper .resume-band p { color: var(--resume-band-text); }
+.resume-paper .resume-rail { background: var(--resume-accent); color: var(--resume-band-text); }
+.resume-paper .resume-rail h1,
+.resume-paper .resume-rail h2,
+.resume-paper .resume-rail p,
+.resume-paper .resume-rail a,
+.resume-paper .resume-rail li { color: var(--resume-band-text); }
 button, input, select, textarea { font: inherit; }
 input, select, textarea { font-family: var(--font-inter), Inter, sans-serif; }
 input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), textarea, select {

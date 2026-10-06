@@ -40,7 +40,10 @@ export const targetResumeContentSchema = z.object({
   candidate: z.object({
     fullName: z.string().trim().min(2).max(120),
     headline: z.string().trim().min(2).max(300),
-    location: z.string().trim().max(200).nullable()
+    location: z.string().trim().max(200).nullable(),
+    email: z.string().trim().email().max(254).nullable().optional(),
+    phone: z.string().trim().min(7).max(40).nullable().optional(),
+    linkedin: z.string().trim().url().max(300).nullable().optional()
   }),
   target: z.object({
     jobTitle: z.string().trim().min(2).max(300),

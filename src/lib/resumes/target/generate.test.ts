@@ -26,7 +26,7 @@ function career(): CareerFacts {
     { type: "ACCOMPLISHMENT" as const, id: accId, label: "Automated the monthly close", text: "Automated the monthly close and shortened reporting cycles." }
   ];
   return {
-    profile: { ownerId, fullName: "Kym Feltus", headline: "Finance systems executive", location: "Atlanta, GA", summary: "Transforms close, consolidation, and reporting.", years: "15" },
+    profile: { ownerId, fullName: "Kym Feltus", headline: "Finance systems executive", location: "Atlanta, GA", summary: "Transforms close, consolidation, and reporting.", years: "15", email: null, phone: null, linkedin: null },
     organizations: [{ id: orgId, name: "Mass Development Group" }],
     titles: [{ id: titleId, name: "Principal" }],
     experiences: [{ id: expId, organizationId: orgId, clientOrganizationId: null, titleId, startDate: "2020-01-01", startPrecision: "MONTH", endDate: null, endPrecision: "UNKNOWN", isCurrent: true, location: "Atlanta, GA", summary: "Led finance transformation", completeness: "COMPLETE" }],
@@ -63,6 +63,8 @@ describe("targeted resume matching", () => {
     const result = analyzeResumeTarget({ title: "Director of Accounting", employer: "Example Capital", description }, career());
     expect(result.matched.some((item) => /NetSuite/i.test(item.originalText))).toBe(true);
     expect(result.pendingConfirmations.some((item) => /Kubernetes/i.test(item.originalText))).toBe(true);
+    expect(result.pendingConfirmations.some((item) => /Python/i.test(item.originalText))).toBe(false);
+    expect(result.pendingConfirmations.some((item) => /internal controls|asc 606|accounting close/i.test(item.originalText))).toBe(false);
   });
 });
 
@@ -86,8 +88,11 @@ describe("targeted resume generation", () => {
       confirmations
     );
     expect(content.thesis).toContain("Example Capital");
-    expect(content.confirmedCapabilities.some((item) => /Python/i.test(item.statement))).toBe(true);
-    expect(`${content.thesis} ${content.summary} ${content.highlights.map((item) => item.text).join(" ")}`.toLowerCase()).not.toMatch(/kubernetes/);
+    expect(content.confirmedCapabilities).toEqual([]);
+    expect(content.highlights).toEqual([]);
+    const page = `${content.thesis} ${content.summary} ${content.experiences.flatMap((item) => item.bullets).join(" ")}`;
+    expect(page).not.toMatch(/I built Python/i);
+    expect(page.toLowerCase()).not.toMatch(/kubernetes/);
     expect(content.experiences[0]?.employer).toBe("Mass Development Group");
   });
 
@@ -117,7 +122,9 @@ describe("targeted resume generation", () => {
       promptText: `I have this experience from finance transformation work, including capability ${item.originalText.slice(-12)}.`
     }));
     const content = generateTargetResume({ career: career(), title: "Director of Accounting", employer: "Example Capital", requirements, confirmations });
-    expect(content.confirmedCapabilities.length).toBeGreaterThan(20);
+    const page = `${content.summary} ${content.highlights.map((item) => item.text).join(" ")} ${content.confirmedCapabilities.map((item) => item.statement).join(" ")}`;
+    expect(page).not.toMatch(/I have this experience/i);
+    expect(content.confirmedCapabilities).toEqual([]);
   });
 
   it("does not write a resume until unmatched requirements are confirmed", () => {
@@ -126,6 +133,6 @@ describe("targeted resume generation", () => {
       ...item,
       id: `11111111-1111-4111-8111-${String(index + 1).padStart(12, "0")}`
     })) as TargetRequirement[];
-    expect(() => generateTargetResume({ career: career(), title: "Director of Accounting", employer: "Example Capital", requirements, confirmations: [] })).toThrow(/Confirm whether you have each unmatched requirement/i);
+    expect(() => generateTargetResume({ career: career(), title: "Director of Accounting", employer: "Example Capital", requirements, confirmations: [] })).toThrow(/Confirm whether you have each mandatory qualification/i);
   });
 });

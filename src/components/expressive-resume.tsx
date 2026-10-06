@@ -26,8 +26,8 @@ export function ExpressiveResume({ content }: { content: TargetResumeContent }) 
               <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-[#8A6A32]">Selected for this role</p>
               <h2 className="mt-1 font-serif text-3xl tracking-[-.03em]">What this version elevates</h2>
               <ol className="mt-5 grid gap-4 sm:grid-cols-2">
-                {content.highlights.map((item) => (
-                  <li key={`${item.source}:${item.text.slice(0, 24)}`} className="border-l-2 border-[#C4A574] bg-white/55 py-3 pl-4 pr-3">
+                {content.highlights.map((item, index) => (
+                  <li key={`${item.source}:${index}:${item.text}`} className="border-l-2 border-[#C4A574] bg-white/55 py-3 pl-4 pr-3">
                     <p className="text-[10px] font-semibold uppercase tracking-[.16em] text-[#8A6A32]">{item.label}</p>
                     <p className="mt-2 text-sm leading-7 text-[#3D3228]">{item.text}</p>
                   </li>

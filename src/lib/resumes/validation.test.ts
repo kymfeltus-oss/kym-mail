@@ -17,7 +17,7 @@ const ids = {
 const job = { title: "Chief Financial Officer", employer: "Planned Parenthood" };
 
 const career: CareerFacts = {
-  profile: { ownerId: ids.owner, fullName: "Kym Feltus, MBA", headline: "Finance Executive", location: "DFW, Texas", summary: "Finance leader connecting accounting accuracy with executive decisions.", years: "23+" },
+  profile: { ownerId: ids.owner, fullName: "Kym Feltus, MBA", headline: "Finance Executive", location: "DFW, Texas", summary: "Finance leader connecting accounting accuracy with executive decisions.", years: "23+", email: null, phone: null, linkedin: null },
   organizations: [{ id: ids.org, name: "Example Corporation" }],
   titles: [{ id: ids.title, name: "Corporate Controller" }],
   experiences: [{ id: ids.experience, organizationId: ids.org, clientOrganizationId: null, titleId: ids.title, startDate: "2012-01-01", startPrecision: "YEAR", endDate: "2018-01-01", endPrecision: "YEAR", isCurrent: false, location: null, summary: "Led finance controls and reporting.", completeness: "COMPLETE" }],

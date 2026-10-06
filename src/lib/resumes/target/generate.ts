@@ -40,14 +40,9 @@ export function generateTargetResume(input: {
   const { career, title, employer, requirements, confirmations } = input;
   const confirmationByRequirement = new Map(confirmations.map((item) => [item.requirementId, item]));
   const pending = requirements.filter((item) => item.needsConfirmation && !confirmationByRequirement.has(item.id));
-  if (pending.length) throw new TargetResumeError("CONFIRMATIONS_REQUIRED", "Confirm whether you have each unmatched requirement before this resume can be written.");
+  if (pending.length) throw new TargetResumeError("CONFIRMATIONS_REQUIRED", "Confirm whether you have each mandatory qualification before this resume can be written.");
 
   const matched = requirements.filter((item) => item.matchState === "STRONG_MATCH" || item.matchState === "MATCH");
-  const confirmed = requirements.flatMap((requirement) => {
-    const confirmation = confirmationByRequirement.get(requirement.id);
-    if (!confirmation || confirmation.answer !== "YES") return [];
-    return [{ requirement, statement: confirmation.promptText.trim() }];
-  });
 
   const organizations = new Map(career.organizations.map((item) => [item.id, item.name]));
   const titles = new Map(career.titles.map((item) => [item.id, item.name]));
@@ -87,8 +82,12 @@ export function generateTargetResume(input: {
 
   if (!experiences.length) throw new TargetResumeError("CAREER_PROFILE_INCOMPLETE", "Add complete employment records to your Career Profile before a targeted resume can be written.");
 
-  const projects = career.projects
-    .filter((item) => relevantProjectIds.has(item.id))
+  const portfolioPlaceholder = /documented in the authoritative career portfolio source/i;
+  const eligibleProjects = career.projects.filter((item) => !portfolioPlaceholder.test(item.summary));
+  const projects = [
+    ...eligibleProjects.filter((item) => relevantProjectIds.has(item.id)),
+    ...eligibleProjects.filter((item) => !relevantProjectIds.has(item.id))
+  ]
     .slice(0, 4)
     .map((project) => ({
       projectId: project.id,
@@ -107,25 +106,12 @@ export function generateTargetResume(input: {
     skills: orderedSkills.filter((skill) => skill.category === category).slice(0, 24).map((skill) => ({ skillId: skill.id, name: skill.name }))
   })).filter((group) => group.skills.length);
 
-  const matchedHighlights = matched.slice(0, 4).flatMap((requirement) => {
-    const evidence = requirement.matchedEvidence[0];
-    if (!evidence) return [];
-    return [{ label: requirement.category.replaceAll("_", " ").toLowerCase(), text: evidence.excerpt.slice(0, 800), source: "MATCHED" as const }];
-  });
-  const confirmedHighlights = confirmed.slice(0, 2).map((item) => ({
-    label: "owner confirmed",
-    text: item.statement.slice(0, 800),
-    source: "CONFIRMED" as const
-  }));
-
-  const leadEvidence = matched[0]?.matchedEvidence[0]?.excerpt ?? career.profile.summary;
   const content = {
-    candidate: { fullName: career.profile.fullName, headline: career.profile.headline, location: career.profile.location },
+    candidate: { fullName: career.profile.fullName, headline: career.profile.headline, location: career.profile.location, email: career.profile.email, phone: career.profile.phone, linkedin: career.profile.linkedin },
     target: { jobTitle: title, employer },
     thesis: `${career.profile.headline} composed for ${employer}'s ${title} brief.`,
-    summary: compact([career.profile.summary, leadEvidence === career.profile.summary ? null : leadEvidence]).join(" ")
-      .slice(0, 3000),
-    highlights: [...matchedHighlights, ...confirmedHighlights].slice(0, 6),
+    summary: career.profile.summary.slice(0, 3000),
+    highlights: [],
     experiences,
     projects,
     skillGroups,
@@ -141,11 +127,7 @@ export function generateTargetResume(input: {
       name: item.name,
       status: item.status
     })),
-    confirmedCapabilities: confirmed.slice(0, 80).map((item) => ({
-      requirementId: item.requirement.id,
-      requirement: item.requirement.originalText.slice(0, 2000),
-      statement: item.statement.slice(0, 2000)
-    }))
+    confirmedCapabilities: []
   };
 
   const parsed = targetResumeContentSchema.safeParse(content);

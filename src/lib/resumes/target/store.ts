@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { loadCareerFacts } from "@/lib/resumes/career";
 import { analyzeResumeTarget, JobAnalysisInputError } from "@/lib/resumes/target/analyze";
+import { qualificationNeedsConfirmation } from "@/lib/resumes/target/confirm";
 import { generateTargetResume, TargetResumeError } from "@/lib/resumes/target/generate";
 import { identifyResumeTargetIntelligence, resumeTargetIntelligenceSchema } from "@/lib/resumes/target/intelligence";
 import { targetConfirmationSchema, targetRequirementSchema, targetResumeContentSchema, type TargetConfirmationInput, type TargetRequirement, type TargetResumeListItem, type TargetResumeView } from "@/lib/resumes/target/types";
@@ -66,6 +67,27 @@ export async function loadResumeTarget(database: SupabaseClient, ownerId: string
       : Promise.resolve({ data: null, error: null })
   ]);
   if (requirementError || confirmationError || versionError) throw new TargetResumeError("RESUME_TARGET_UNAVAILABLE", "This targeted resume could not be loaded.");
+  const career = await loadCareerFacts(database, ownerId);
+  const requirements = ((requirementRows ?? []) as RequirementRow[]).map((row) => {
+    const requirement = mapRequirement(row);
+    return { ...requirement, needsConfirmation: qualificationNeedsConfirmation(requirement, career) };
+  });
+  const parsedVersion = version ? targetResumeContentSchema.parse(version.content) : null;
+  const currentVersion = version && parsedVersion ? {
+    id: version.id,
+    versionNumber: version.version_number,
+    content: {
+      ...parsedVersion,
+      projects: parsedVersion.projects.filter((project) => !project.bullets.some((bullet) => /documented in the authoritative career portfolio source/i.test(bullet))),
+      candidate: {
+        ...parsedVersion.candidate,
+        email: career.profile.email,
+        phone: career.profile.phone,
+        linkedin: career.profile.linkedin
+      }
+    },
+    createdAt: version.created_at
+  } : null;
   return {
     id: target.id,
     title: target.title,
@@ -74,9 +96,9 @@ export async function loadResumeTarget(database: SupabaseClient, ownerId: string
     status: target.status,
     failureMessage: target.failure_message,
     createdAt: target.created_at,
-    requirements: ((requirementRows ?? []) as RequirementRow[]).map(mapRequirement),
+    requirements,
     confirmations: (confirmationRows ?? []).map((row) => ({ requirementId: row.requirement_id, answer: row.answer, promptText: row.prompt_text })),
-    currentVersion: version ? { id: version.id, versionNumber: version.version_number, content: targetResumeContentSchema.parse(version.content), createdAt: version.created_at } : null,
+    currentVersion,
     intelligenceStatus: (target.intelligence_status as TargetResumeView["intelligenceStatus"] | null) ?? "NOT_RUN",
     intelligenceFailure: target.intelligence_failure ?? null,
     intelligence: target.intelligence && Object.keys(target.intelligence as object).length
@@ -124,7 +146,6 @@ export async function saveResumeTargetConfirmations(database: SupabaseClient, ow
   const parsed = confirmations.map((item) => targetConfirmationSchema.parse(item));
   if (parsed.some((item) => !pendingIds.has(item.requirementId))) throw new TargetResumeError("CONFIRMATION_INVALID", "A confirmation does not belong to this job description.");
   for (const item of parsed) {
-    if (item.answer === "YES" && item.promptText.trim().length < 20) throw new TargetResumeError("CONFIRMATION_PROMPT_REQUIRED", "If you have the experience, describe it in your own words so the resume can use it.");
     if (item.answer === "NO" && item.promptText.trim().length) throw new TargetResumeError("CONFIRMATION_INVALID", "Leave the experience note empty when you do not have the requirement.");
   }
   if (parsed.length) {
@@ -172,6 +193,39 @@ export async function generateResumeTargetVersion(database: SupabaseClient, owne
     }
     throw mapped;
   }
+}
+
+const resumeProjectEditSchema = z.array(z.object({
+  projectId: z.string().uuid(),
+  name: z.string().trim().min(2).max(200),
+  bullets: z.array(z.string().trim().min(10).max(800)).min(1).max(2)
+})).max(6);
+
+export async function saveResumeTargetProjects(database: SupabaseClient, ownerId: string, targetId: string, input: unknown) {
+  const projects = resumeProjectEditSchema.parse(input);
+  const target = await loadResumeTarget(database, ownerId, targetId);
+  if (!target?.currentVersion) throw new TargetResumeError("RESUME_TARGET_NOT_FOUND", "Write the résumé before editing projects.");
+  const career = await loadCareerFacts(database, ownerId);
+  const known = new Set(career.projects.map((item) => item.id));
+  if (projects.some((item) => !known.has(item.projectId))) throw new TargetResumeError("RESUME_TARGET_INVALID", "Choose a project from your Career Profile.");
+  if (new Set(projects.map((item) => item.projectId)).size !== projects.length) throw new TargetResumeError("RESUME_TARGET_INVALID", "Each project can appear only once.");
+  for (const project of projects) {
+    const impact = project.bullets[1]?.trim() || null;
+    if (impact && impact.length < 5) throw new TargetResumeError("RESUME_TARGET_INVALID", "The second project line needs at least a short sentence.");
+    const { error } = await database.from("career_projects").update({
+      canonical_name: project.name,
+      summary: project.bullets[0],
+      impact
+    }).eq("id", project.projectId).eq("owner_id", ownerId);
+    if (error) throw new TargetResumeError("RESUME_TARGET_INVALID", "The project could not be saved. Check the name and try again.");
+  }
+  const content = targetResumeContentSchema.parse({
+    ...target.currentVersion.content,
+    projects: projects.map((project) => ({ projectId: project.projectId, name: project.name, bullets: project.bullets }))
+  });
+  const { error } = await database.from("resume_target_versions").update({ content }).eq("id", target.currentVersion.id).eq("owner_id", ownerId);
+  if (error) throw new TargetResumeError("RESUME_TARGET_INVALID", "The résumé projects could not be saved.");
+  return { saved: projects.length };
 }
 
 export async function identifyResumeTargetCompany(database: SupabaseClient, ownerId: string, targetId: string) {

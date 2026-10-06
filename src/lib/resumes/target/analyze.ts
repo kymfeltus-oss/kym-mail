@@ -1,10 +1,10 @@
 import { analyzeJobDescription, JobAnalysisInputError, fingerprint, type CareerEvidence, type CareerEvidenceType } from "@/lib/jobs/analysis";
 import type { CareerFacts } from "@/lib/resumes/career";
+import { qualificationNeedsConfirmation } from "@/lib/resumes/target/confirm";
 import type { TargetRequirement } from "@/lib/resumes/target/types";
 
 export { JobAnalysisInputError, fingerprint };
 
-const confirmationStates = new Set(["NO_MATCH", "UNVERIFIED", "PARTIAL_MATCH"]);
 const evidenceTypes = new Set<CareerEvidenceType>(["PROFILE", "EXPERIENCE", "EDUCATION", "CREDENTIAL", "SKILL", "PROJECT", "ACCOMPLISHMENT", "METRIC"]);
 
 export function careerFactsToEvidence(career: CareerFacts): CareerEvidence[] {
@@ -20,8 +20,8 @@ export function careerFactsToEvidence(career: CareerFacts): CareerEvidence[] {
   });
 }
 
-export function needsTargetConfirmation(matchState: TargetRequirement["matchState"]) {
-  return confirmationStates.has(matchState);
+export function needsTargetConfirmation(requirement: Pick<TargetRequirement, "importance" | "matchState" | "category" | "originalText">, career: CareerFacts) {
+  return qualificationNeedsConfirmation(requirement, career);
 }
 
 export function analyzeResumeTarget(input: { title: string; employer: string; description: string }, career: CareerFacts) {
@@ -42,7 +42,7 @@ export function analyzeResumeTarget(input: { title: string; employer: string; de
       label: match.evidence.label.slice(0, 300),
       excerpt: match.evidence.text.slice(0, 800)
     })),
-    needsConfirmation: needsTargetConfirmation(item.matchState)
+    needsConfirmation: needsTargetConfirmation(item, career)
   }));
   return {
     fingerprint: fingerprint(input.description),
