@@ -19,7 +19,7 @@ export const emailLooks = [
   { id: "personal", name: "Personal", company: null, description: "KYM Mail stationery" },
   { id: "snaptax", name: "SnapTax", company: "SnapTax", description: "SnapTax stationery" },
   { id: "securafin", name: "SecuraFin-AI", company: "SecuraFin-AI", description: "SecuraFin-AI stationery" },
-  { id: "parable", name: "PARABLE", company: "PARABLE", description: "PARABLE stationery" },
+  { id: "parable", name: "PARABLE WORLD", company: "PARABLE WORLD", description: "PARABLE WORLD signal stationery" },
   { id: "mass", name: "MASS DEVELOPMENT GROUP", company: "MASS DEVELOPMENT GROUP", description: "MASS DEVELOPMENT GROUP stationery" }
 ] as const;
 
@@ -36,6 +36,7 @@ export function isEmailLook(value: unknown): value is EmailLook {
 
 export function defaultEmailLookForSender(from: string, label = "") {
   const email = from.trim().toLowerCase();
+  if (/parable/.test(email) || /parable/.test(label)) return "parable" as const;
   if (email === "kym@kymmailapp.com" || /\bpersonal\b/i.test(label)) return "personal" as const;
   return "personal" as const;
 }
@@ -94,21 +95,22 @@ const looks = {
     signMeta: "margin:6px 0 0;color:#5A6A72;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:13px;line-height:1.55"
   },
   parable: {
-    page: "#2A1418",
-    card: "#F8F1E6",
-    cardBorder: "#4A2A30",
-    masthead: "#4A1520",
-    wordmark: "PARABLE",
-    wordmarkStyle: "margin:0;color:#F8F1E6;font-family:Didot,'Bodoni MT',Georgia,'Times New Roman',serif;font-size:30px;font-weight:400;letter-spacing:.34em",
-    kicker: "Studio correspondence",
-    kickerStyle: "margin:10px 0 0;color:#E3C6A0;font-family:Helvetica Neue,Helvetica,Arial,sans-serif;font-size:10px;letter-spacing:.32em;text-transform:uppercase",
-    rule: "#C4A574",
-    subjectStyle: "margin:0 0 28px;color:#4A1520;font-family:Didot,'Bodoni MT',Georgia,'Times New Roman',serif;font-size:22px;font-weight:400;line-height:1.35",
-    body: "color:#2A1A16;font-size:16px;line-height:1.75;font-family:Georgia,'Times New Roman',serif",
-    link: "#7A2433",
-    linkLine: "#C4A574",
-    signName: "margin:0;color:#4A1520;font-family:Didot,'Bodoni MT',Georgia,'Times New Roman',serif;font-size:18px",
-    signMeta: "margin:6px 0 0;color:#7A6458;font-family:Georgia,'Times New Roman',serif;font-size:13px;line-height:1.55"
+    page: "#02050D",
+    card: "#08111E",
+    cardBorder: "#16D9F4",
+    masthead: "#02040A",
+    wordmark: "PARABLE WORLD",
+    wordmarkStyle: "margin:0;color:#EAFDFF;font-family:Montserrat,'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:18px;font-weight:700;letter-spacing:.24em",
+    kicker: "Virtual ministry operating system",
+    kickerStyle: "margin:12px 0 0;color:#7DEEFF;font-family:Montserrat,'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:9px;font-weight:700;letter-spacing:.28em;text-transform:uppercase",
+    rule: "#00E5FF",
+    subjectStyle: "margin:0 0 28px;color:#F5FEFF;font-family:Montserrat,'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:22px;font-weight:600;letter-spacing:-.01em;line-height:1.35",
+    body: "color:#C7D6E8;font-size:16px;line-height:1.75;font-family:Inter,'Helvetica Neue',Helvetica,Arial,sans-serif",
+    link: "#38E8FF",
+    linkLine: "#C05CFF",
+    signName: "margin:0;color:#F5FEFF;font-family:Montserrat,'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:16px;font-weight:700",
+    signMeta: "margin:6px 0 0;color:#91A7C2;font-family:Inter,'Helvetica Neue',Helvetica,Arial,sans-serif;font-size:13px;line-height:1.55",
+    mastheadImage: "/brand/parable-world-neon-lockup.png"
   },
   mass: {
     page: "#030B16",
@@ -175,7 +177,8 @@ export function buildProfessionalEmailHtml({
   const content = formatMessageHtml(body, selected) || `<p style="margin:0;${theme.body}">${escapeHtml(body)}</p>`;
   const logoPath = "mastheadImage" in theme ? theme.mastheadImage : "";
   const logoBase = process.env.APP_URL?.trim().replace(/\/$/, "") ?? "";
-  const logo = logoPath ? `<img src="${logoBase}${logoPath}" alt="KYM MAIL" width="220" style="display:block;margin:0 auto 16px;height:auto;border:0" />` : "";
+  const logoAlt = selected === "parable" ? "PARABLE WORLD Virtual Ministry Operating System" : "KYM MAIL";
+  const logo = logoPath ? `<img src="${logoBase}${logoPath}" alt="${logoAlt}" width="${selected === "parable" ? "420" : "220"}" style="display:block;margin:0 auto 16px;height:auto;border:0" />` : "";
   return `<!DOCTYPE html>
 <html lang="en">
 <head>

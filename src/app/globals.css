@@ -78,6 +78,13 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
   width: min(100%, 36rem);
   margin-inline: auto;
 }
+.parable-mailbox-grid {
+  background-image:
+    linear-gradient(rgba(92, 236, 255, .1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(92, 236, 255, .1) 1px, transparent 1px);
+  background-size: 26px 26px;
+  mask-image: linear-gradient(90deg, transparent, black 18%, black 82%, transparent);
+}
 @media (min-width: 1024px) {
   .kym-hero-art {
     position: absolute;

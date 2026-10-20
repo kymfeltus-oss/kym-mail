@@ -32,7 +32,7 @@ describe("professional outgoing email HTML", () => {
     const companies = [
       { look: "snaptax" as const, wordmark: "SNAPTAX", company: "SnapTax" },
       { look: "securafin" as const, wordmark: "SECURAFIN-AI", company: "SecuraFin-AI" },
-      { look: "parable" as const, wordmark: "PARABLE", company: "PARABLE" },
+      { look: "parable" as const, wordmark: "PARABLE WORLD", company: "PARABLE WORLD" },
       { look: "mass" as const, wordmark: "MASS DEVELOPMENT GROUP", company: "MASS DEVELOPMENT GROUP" }
     ];
     for (const company of companies) {
@@ -62,5 +62,19 @@ describe("professional outgoing email HTML", () => {
     expect(mass).toContain("Unify. Transform. Deliver.");
     expect(mass).not.toContain("Development correspondence");
     expect(emailLooks.map((look) => look.id)).toEqual(["personal", "snaptax", "securafin", "parable", "mass"]);
+  });
+
+  it("uses PARABLE WORLD neon stationery for an associated sender", () => {
+    expect(defaultEmailLookForSender("hello@parableworld.org", "Parable World Team")).toBe("parable");
+    const html = buildProfessionalEmailHtml({
+      from: "hello@parableworld.org",
+      subject: "A new signal",
+      body: "Welcome to PARABLE WORLD.",
+      look: "parable"
+    });
+    expect(html).toContain("Virtual ministry operating system");
+    expect(html).toContain("/brand/parable-world-neon-lockup.png");
+    expect(html).toContain("#00E5FF");
+    expect(html).toContain("PARABLE WORLD");
   });
 });

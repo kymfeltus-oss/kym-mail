@@ -26,10 +26,11 @@ function localInputValue(date: Date) {
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
 
-export function ComposeForm({ identities, projects = [], initialProjectId = "", draft, successPath, onSent }: {
+export function ComposeForm({ identities, projects = [], initialProjectId = "", initialLook, draft, successPath, onSent }: {
   identities: ComposeIdentity[];
   projects?: ComposeProject[];
   initialProjectId?: string;
+  initialLook?: EmailLook;
   draft?: ComposeDraft;
   successPath?: string;
   onSent?: () => void;
@@ -52,7 +53,7 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
   const [timezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Chicago");
   const [body, setBody] = useState(draft?.body ?? "");
   const [subject, setSubject] = useState(draft?.subject ?? "");
-  const [look, setLook] = useState<EmailLook>(() => defaultEmailLookForSender(from, draftIdentity?.label ?? initialProjectIdentity?.label ?? globalDefault?.label ?? ""));
+  const [look, setLook] = useState<EmailLook>(() => initialLook ?? defaultEmailLookForSender(from, draftIdentity?.label ?? initialProjectIdentity?.label ?? globalDefault?.label ?? ""));
   const selectedProject = projects.find((project) => project.id === projectId);
   const previewChrome = emailLookChrome(look);
   const defaultIdentityUnavailable = Boolean(selectedProject && !identities.some((identity) => identity.id === selectedProject.default_mail_account_id));

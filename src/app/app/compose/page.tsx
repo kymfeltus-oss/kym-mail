@@ -3,10 +3,11 @@ import { AppShell } from "@/components/app-shell";
 import { ComposeForm } from "@/components/compose-form";
 import { GmailConnectionPanel } from "@/components/gmail-connection-panel";
 import { getOwnerContext } from "@/lib/auth/owner-context";
+import { isEmailLook } from "@/lib/mail/professional-html";
 
 export const metadata = { title: "Compose" };
 
-export default async function ComposePage({ searchParams }: { searchParams: Promise<{ project?: string }> }) {
+export default async function ComposePage({ searchParams }: { searchParams: Promise<{ project?: string; brand?: string }> }) {
   const owner = await getOwnerContext();
   if (!owner?.user.email) redirect("/sign-in");
   const [{ data: identities, error: identityError }, { data: projects, error: projectError }, { data: connection, error: connectionError }] = await Promise.all([
@@ -15,15 +16,17 @@ export default async function ComposePage({ searchParams }: { searchParams: Prom
     owner.database.from("mail_connections").select("provider_account_id, connection_state, initial_sync_completed_at, last_synced_at, sync_error").eq("owner_id", owner.user.id).eq("provider", "google").maybeSingle()
   ]);
   if (identityError || projectError || connectionError) throw new Error("COMPOSE_CONTEXT_UNAVAILABLE");
-  const requestedProjectId = (await searchParams).project ?? "";
+  const params = await searchParams;
+  const requestedProjectId = params.project ?? "";
   const initialProjectId = (projects ?? []).some((project) => project.id === requestedProjectId) ? requestedProjectId : "";
+  const initialLook = isEmailLook(params.brand) ? params.brand : undefined;
   return <AppShell email={owner.user.email} canSignOut={owner.mode === "authenticated"} active="compose">
     <div className="mx-auto max-w-4xl">
       <p className="text-xs font-semibold uppercase tracking-[.22em] text-[#22D3EE]">New message</p>
       <h1 className="mt-2 text-3xl font-semibold tracking-[-.03em] text-[#F4F7FB] sm:text-4xl">Compose</h1>
       <p className="mb-7 mt-3 text-sm leading-6 text-[#93A0B5]">Send through your verified KYM Mail identity.</p>
       <GmailConnectionPanel connection={connection ?? null} availableIdentityCount={identities?.length ?? 0} />
-      {identities?.length ? <ComposeForm identities={identities} projects={projects ?? []} initialProjectId={initialProjectId} /> : <p className="text-sm leading-6 text-[#93A0B5]">A verified sender is required before composing. Use Reconnect Google Mail above if Gmail went offline.</p>}
+      {identities?.length ? <ComposeForm identities={identities} projects={projects ?? []} initialProjectId={initialProjectId} initialLook={initialLook} /> : <p className="text-sm leading-6 text-[#93A0B5]">A verified sender is required before composing. Use Reconnect Google Mail above if Gmail went offline.</p>}
     </div>
   </AppShell>;
 }

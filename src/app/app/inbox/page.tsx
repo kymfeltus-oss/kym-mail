@@ -3,10 +3,11 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { GmailConnectionPanel } from "@/components/gmail-connection-panel";
 import { MailboxBrowser } from "@/components/mailbox-browser";
+import { ParableWorldMailbox } from "@/components/parable-world-mailbox";
 import { withMessageParties } from "@/lib/mail/mailbox-query";
 import { getOwnerContext } from "@/lib/auth/owner-context";
 
-export const metadata = { title: "Inbox" };
+export const metadata = { title: "PARABLE WORLD Inbox" };
 
 export default async function InboxPage() {
   const owner = await getOwnerContext();
@@ -38,13 +39,11 @@ export default async function InboxPage() {
     inboxMessages ?? []
   );
   const availableIdentityCount = accounts.filter((account) => account.send_as_state === "available").length;
+  const unreadCount = threads.filter((thread) => thread.is_unread).length;
 
   return <AppShell email={owner.user.email} canSignOut={owner.mode === "authenticated"} active="inbox">
     <div className="mx-auto max-w-5xl">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div><p className="text-xs font-semibold uppercase tracking-[.22em] text-[#22D3EE]">Unified mailbox</p><h1 className="mt-2 text-3xl font-semibold tracking-[-.03em] text-[#F4F7FB] sm:text-4xl">Inbox</h1></div>
-        <Link href="/app/compose" className="rounded-full kym-action px-5 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(37,99,235,.22)] transition ">Compose</Link>
-      </div>
+      <ParableWorldMailbox unreadCount={unreadCount} threadCount={threads.length} identityCount={availableIdentityCount} />
 
       <GmailConnectionPanel connection={connection ?? null} availableIdentityCount={availableIdentityCount} />
       {bouncedThreadIds.size > 0 && <Link href="/app/undeliverable" className="mt-6 block rounded-2xl border border-[#1D4E89] bg-[#122033] px-5 py-4 text-sm font-semibold text-[#67E8F9]">{bouncedThreadIds.size} undeliverable {bouncedThreadIds.size === 1 ? "conversation was" : "conversations were"} moved to the Undeliverable box.</Link>}
