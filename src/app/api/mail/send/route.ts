@@ -2,12 +2,14 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getOwnerContext } from "@/lib/auth/owner-context";
 import { toSafeError, ValidationError } from "@/lib/errors";
 import { log } from "@/lib/logger";
-import { validateAttachmentFiles } from "@/lib/mail/attachment-validation";
+import { validateAttachmentEntries, validateAttachmentFiles } from "@/lib/mail/attachment-validation";
 import { validateComposeInput } from "@/lib/mail/compose-validation";
 import { buildProfessionalEmailHtml, defaultEmailLookForSender, isEmailLook } from "@/lib/mail/professional-html";
 import { loadForwardedAttachments, parseForwardAttachmentIds } from "@/lib/mail/forwarded-attachments";
 import { loadGoogleProvider, syncGmailMessageById } from "@/lib/mail/gmail-sync";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { composeAttachmentBucket } from "@/lib/scheduling/constants";
+import { loadStagedAttachments, parseStagedAttachmentRefs } from "@/lib/mail/staged-attachments";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -19,8 +21,13 @@ export async function POST(request: NextRequest) {
   const origin = request.headers.get("origin");
   if (origin && origin !== request.nextUrl.origin) return NextResponse.json({ error: "Request origin is not allowed." }, { status: 403 });
 
+  const stagedPaths: string[] = [];
+  let database: ReturnType<typeof createSupabaseAdminClient> | null = null;
   try {
     const form = await request.formData();
+    database = createSupabaseAdminClient();
+    const stagedRefs = parseStagedAttachmentRefs(form.get("uploadedAttachments"), owner.user.id);
+    stagedPaths.push(...stagedRefs.map((ref) => ref.path));
     const rawProjectId = form.get("projectId");
     const projectId = typeof rawProjectId === "string" && rawProjectId ? z.string().uuid().parse(rawProjectId) : null;
     const input = validateComposeInput({
@@ -62,9 +69,14 @@ export async function POST(request: NextRequest) {
       if (projectError || !project) throw new ValidationError("Select an active Project or choose None.");
     }
 
-    const database = createSupabaseAdminClient();
     const { provider } = await loadGoogleProvider(database, identity.mail_connection_id);
-    const uploadedAttachments = await Promise.all(files.map(async (file) => ({ filename: file.name, mimeType: file.type || "application/octet-stream", content: new Uint8Array(await file.arrayBuffer()) })));
+    const uploadedAttachments = [
+      ...await loadStagedAttachments(database, stagedRefs),
+      ...await Promise.all(files.map(async (file) => ({ filename: file.name, mimeType: file.type || "application/octet-stream", content: new Uint8Array(await file.arrayBuffer()) })))
+    ];
+    if (!validateAttachmentEntries(uploadedAttachments.map((attachment) => ({ name: attachment.filename, size: attachment.content.byteLength })))) {
+      throw new ValidationError("The combined attachments are unsupported, too large, or too numerous.");
+    }
     const forwardedAttachments = await loadForwardedAttachments(
       database,
       owner.user.id,
@@ -90,12 +102,17 @@ export async function POST(request: NextRequest) {
     let synchronized = true;
     try { await syncGmailMessageById(database, identity.mail_connection_id, result.messageId, projectId); }
     catch { synchronized = false; }
-    log("info", "mail.message_sent", { mailConnectionId: identity.mail_connection_id, synchronized, attachmentCount: files.length + forwardedAttachments.length, projectAssociated: Boolean(projectId), forwardedAttachmentCount: forwardedAttachments.length });
+    log("info", "mail.message_sent", { mailConnectionId: identity.mail_connection_id, synchronized, attachmentCount: uploadedAttachments.length + forwardedAttachments.length, projectAssociated: Boolean(projectId), forwardedAttachmentCount: forwardedAttachments.length });
     return NextResponse.json({ sent: true, synchronized, messageId: result.messageId, threadId: result.threadId }, { status: synchronized ? 200 : 202 });
   } catch (error) {
     const safeError = toSafeError(error);
     log("error", "mail.message_send_failed", { code: safeError.code });
     const validationFailure = error instanceof z.ZodError || safeError.code === "VALIDATION";
-    return NextResponse.json({ error: validationFailure ? "Select a valid Project and check the message details." : safeError.safeMessage }, { status: validationFailure ? 400 : safeError.code === "UNAUTHORIZED" ? 401 : 503 });
+    return NextResponse.json({ error: safeError.safeMessage }, { status: validationFailure ? 400 : safeError.code === "UNAUTHORIZED" ? 401 : 503 });
+  } finally {
+    if (database && stagedPaths.length) {
+      const { error } = await database.storage.from(composeAttachmentBucket).remove(stagedPaths);
+      if (error) log("error", "mail.attachment_cleanup_failed", { attachmentCount: stagedPaths.length });
+    }
   }
 }

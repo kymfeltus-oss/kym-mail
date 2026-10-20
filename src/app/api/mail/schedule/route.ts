@@ -4,13 +4,14 @@ import { getOwnerContext } from "@/lib/auth/owner-context";
 import { toSafeError, ValidationError } from "@/lib/errors";
 import { log } from "@/lib/logger";
 import { attachmentSha256 } from "@/lib/mail/attachment-hash";
-import { validateAttachmentFiles } from "@/lib/mail/attachment-validation";
+import { validateAttachmentEntries, validateAttachmentFiles } from "@/lib/mail/attachment-validation";
 import { validateComposeInput } from "@/lib/mail/compose-validation";
 import { loadForwardedAttachments, parseForwardAttachmentIds } from "@/lib/mail/forwarded-attachments";
 import { requireScheduledIdentity, resolveScheduledProject } from "@/lib/scheduling/access";
-import { scheduledAttachmentBucket, scheduledRfcMessageId } from "@/lib/scheduling/constants";
+import { composeAttachmentBucket, scheduledAttachmentBucket, scheduledRfcMessageId } from "@/lib/scheduling/constants";
 import { validateScheduleTiming } from "@/lib/scheduling/validation";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { loadStagedAttachments, parseStagedAttachmentRefs } from "@/lib/mail/staged-attachments";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -27,9 +28,12 @@ export async function POST(request: NextRequest) {
 
   const database = createSupabaseAdminClient();
   const uploadedPaths: string[] = [];
+  const stagedPaths: string[] = [];
   let scheduledId: string | null = null;
   try {
     const form = await request.formData();
+    const stagedRefs = parseStagedAttachmentRefs(form.get("uploadedAttachments"), owner.user.id);
+    stagedPaths.push(...stagedRefs.map((ref) => ref.path));
     const input = validateComposeInput({
       from: form.get("from"),
       to: form.get("to"),
@@ -52,7 +56,13 @@ export async function POST(request: NextRequest) {
 
     const identity = await requireScheduledIdentity(owner.database, owner.user.id, input.from);
     const projectId = await resolveScheduledProject(owner.database, owner.user.id, requestedProjectId, input.providerThreadId);
-    const uploadedAttachments = await Promise.all(files.map(async (file) => ({ filename: file.name, mimeType: file.type || "application/octet-stream", content: new Uint8Array(await file.arrayBuffer()) })));
+    const uploadedAttachments = [
+      ...await loadStagedAttachments(database, stagedRefs),
+      ...await Promise.all(files.map(async (file) => ({ filename: file.name, mimeType: file.type || "application/octet-stream", content: new Uint8Array(await file.arrayBuffer()) })))
+    ];
+    if (!validateAttachmentEntries(uploadedAttachments.map((attachment) => ({ name: attachment.filename, size: attachment.content.byteLength })))) {
+      throw new ValidationError("The combined attachments are unsupported, too large, or too numerous.");
+    }
     const forwardedAttachments = await loadForwardedAttachments(
       database,
       owner.user.id,
@@ -103,5 +113,10 @@ export async function POST(request: NextRequest) {
     const validationFailure = error instanceof z.ZodError || safeError.code === "VALIDATION";
     log("error", "mail.schedule_create_failed", { code: safeError.code });
     return NextResponse.json({ error: validationFailure ? safeError.safeMessage : "The email could not be scheduled." }, { status: validationFailure ? 400 : 503 });
+  } finally {
+    if (stagedPaths.length) {
+      const { error } = await database.storage.from(composeAttachmentBucket).remove(stagedPaths);
+      if (error) log("error", "mail.attachment_cleanup_failed", { attachmentCount: stagedPaths.length });
+    }
   }
 }

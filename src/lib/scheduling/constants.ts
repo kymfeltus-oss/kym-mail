@@ -1,4 +1,5 @@
 export const scheduledAttachmentBucket = "scheduled-mail-attachments";
+export const composeAttachmentBucket = "mail-compose-uploads";
 export const scheduledStatuses = ["SCHEDULED", "PROCESSING", "SENT", "FAILED", "CANCELLED"] as const;
 export type ScheduledStatus = (typeof scheduledStatuses)[number];
 
