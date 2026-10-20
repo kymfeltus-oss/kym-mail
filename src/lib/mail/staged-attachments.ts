@@ -35,7 +35,7 @@ export function parseStagedAttachmentRefs(value: FormDataEntryValue | null, owne
     throw new ValidationError("The uploaded attachment selection is invalid.");
   }
   if (!validateAttachmentEntries(refs.map(({ filename, size }) => ({ name: filename, size })))) {
-    throw new ValidationError("Attachments must be safe file types, up to 18 MB each, with a combined limit of 18 MB and a maximum of 25 files.");
+    throw new ValidationError("Attachments must be safe file types, up to 20 MB each, with a combined limit of 25 MB and a maximum of 25 files.");
   }
   return refs;
 }

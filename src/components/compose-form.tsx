@@ -26,7 +26,7 @@ export type ComposeDraft = {
 type StagedAttachment = { path: string; filename: string; mimeType: string; size: number };
 type SignedAttachmentUpload = { path: string; token: string };
 
-const attachmentLimitMessage = "Add up to 25 safe file types, no larger than 18 MB each or 18 MB total.";
+const attachmentLimitMessage = "Add up to 25 safe file types, no larger than 20 MB each or 25 MB total.";
 
 async function cleanupStagedUploads(paths: string[]) {
   if (!paths.length) return;

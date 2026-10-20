@@ -1,7 +1,7 @@
 import { blockedAttachmentPattern } from "@/lib/mail/compose-validation";
 
-export const MAX_ATTACHMENT_BYTES = 18 * 1024 * 1024;
-export const MAX_TOTAL_ATTACHMENT_BYTES = 18 * 1024 * 1024;
+export const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
+export const MAX_TOTAL_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 export const MAX_ATTACHMENT_COUNT = 25;
 
 export function validateAttachmentEntries(entries: Array<{ name: string; size: number }>) {

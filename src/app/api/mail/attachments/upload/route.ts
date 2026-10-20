@@ -26,7 +26,7 @@ function allowedOrigin(request: NextRequest) {
 }
 
 function attachmentLimitMessage() {
-  return "Attachments must be safe file types, up to 18 MB each, with a combined limit of 18 MB and a maximum of 25 files.";
+  return "Attachments must be safe file types, up to 20 MB each, with a combined limit of 25 MB and a maximum of 25 files.";
 }
 
 export async function POST(request: NextRequest) {
