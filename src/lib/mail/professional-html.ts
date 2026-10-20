@@ -186,22 +186,22 @@ export function buildProfessionalEmailHtml({
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(subject)}</title>
 </head>
-<body style="margin:0;padding:0;background:${theme.page}">
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:${theme.page};padding:36px 12px">
+<body bgcolor="${theme.page}" style="margin:0;padding:0;background:${theme.page}">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="${theme.page}" style="background:${theme.page};padding:36px 12px">
   <tr>
-    <td align="center">
-      <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width:600px;width:100%;background:${theme.card};border:1px solid ${theme.cardBorder}">
+    <td align="center" bgcolor="${theme.page}">
+      <table role="presentation" width="600" cellspacing="0" cellpadding="0" bgcolor="${theme.card}" style="max-width:600px;width:100%;background:${theme.card};border:1px solid ${theme.cardBorder}">
         <tr>
-          <td style="background:${theme.masthead};padding:28px 36px 22px;text-align:center">
+          <td bgcolor="${theme.masthead}" style="background:${theme.masthead};padding:28px 36px 22px;text-align:center">
             ${logo}
             <p style="${theme.wordmarkStyle}">${theme.wordmark}</p>
             ${"productHtml" in theme ? theme.productHtml : ""}
             <p style="${theme.kickerStyle}">${theme.kicker}</p>
           </td>
         </tr>
-        <tr><td style="height:1px;background:${theme.rule};font-size:0;line-height:0">&nbsp;</td></tr>
+        <tr><td bgcolor="${theme.rule}" style="height:1px;background:${theme.rule};font-size:0;line-height:0">&nbsp;</td></tr>
         <tr>
-          <td style="padding:36px 36px 8px">
+          <td bgcolor="${theme.card}" style="padding:36px 36px 8px;background:${theme.card}">
             <p style="${theme.subjectStyle}">${escapeHtml(subject)}</p>
             ${content}
             ${signatureHtml(from, selected)}

@@ -12,6 +12,7 @@ import { composeAttachmentBucket, scheduledAttachmentBucket, scheduledRfcMessage
 import { validateScheduleTiming } from "@/lib/scheduling/validation";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { loadStagedAttachments, parseStagedAttachmentRefs } from "@/lib/mail/staged-attachments";
+import { defaultEmailLookForSender, isEmailLook } from "@/lib/mail/professional-html";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -45,6 +46,8 @@ export async function POST(request: NextRequest) {
       replyToMessageId: form.get("replyToMessageId") || undefined
     });
     if (!input) throw new ValidationError("Check the sender, recipients, subject, and message body.");
+    const rawLook = form.get("emailLook");
+    const emailLook = isEmailLook(rawLook) ? rawLook : defaultEmailLookForSender(input.from);
     const timing = validateScheduleTiming({ scheduledFor: form.get("scheduledFor"), timezone: form.get("timezone") });
     if (!timing) throw new ValidationError("Choose a valid future delivery date and time.");
     const rawProjectId = form.get("projectId");
@@ -95,6 +98,7 @@ export async function POST(request: NextRequest) {
       bcc_addresses: input.bcc,
       subject: input.subject,
       text_body: input.body,
+      email_look: emailLook,
       scheduled_for: timing.scheduledFor,
       next_attempt_at: timing.scheduledFor,
       timezone: timing.timezone

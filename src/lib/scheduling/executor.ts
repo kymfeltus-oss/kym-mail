@@ -5,6 +5,7 @@ import { log } from "@/lib/logger";
 import { loadGoogleProvider, syncGmailMessageById } from "@/lib/mail/gmail-sync";
 import { advanceOutreachAfterSend, guardOutreachSend } from "@/lib/mail/outreach";
 import { scheduledAttachmentBucket } from "@/lib/scheduling/constants";
+import { buildProfessionalEmailHtml, defaultEmailLookForSender, isEmailLook, type EmailLook } from "@/lib/mail/professional-html";
 
 type ScheduledRecord = {
   id: string;
@@ -19,6 +20,7 @@ type ScheduledRecord = {
   bcc_addresses: string[];
   subject: string;
   text_body: string;
+  email_look: EmailLook | null;
   processing_token: string;
   attempt_count: number;
   max_attempts: number;
@@ -193,6 +195,12 @@ export async function executeDueScheduledMessages(database: SupabaseClient): Pro
           bcc: record.bcc_addresses,
           subject: record.subject,
           textBody: record.text_body,
+          htmlBody: buildProfessionalEmailHtml({
+            from: identity.email_address,
+            subject: record.subject,
+            body: record.text_body,
+            look: isEmailLook(record.email_look) ? record.email_look : defaultEmailLookForSender(identity.email_address)
+          }),
           attachments: await storedAttachments(database, record),
           messageId: record.rfc_message_id,
           threadId: record.provider_thread_id ?? undefined,
