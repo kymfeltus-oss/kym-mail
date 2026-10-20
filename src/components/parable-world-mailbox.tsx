@@ -13,7 +13,7 @@ export function ParableWorldMailbox({ unreadCount, threadCount, identityCount }:
     <div aria-hidden="true" className="absolute -right-24 -top-20 -z-10 size-80 rounded-full bg-fuchsia-500/15 blur-3xl" />
     <div aria-hidden="true" className="parable-mailbox-grid absolute inset-0 -z-10 opacity-50" />
 
-    <div className="grid items-center gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(270px,.58fr)] lg:gap-10">
+    <div className="grid items-center gap-6 lg:gap-8">
       <div>
         <div className="flex flex-wrap items-center gap-3 text-[10px] font-bold uppercase tracking-[.26em] text-cyan-200">
           <span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/30 bg-cyan-300/10 px-3 py-1.5"><Radio className="size-3" /> Signal desk</span>
@@ -28,7 +28,7 @@ export function ParableWorldMailbox({ unreadCount, threadCount, identityCount }:
         </div>
       </div>
 
-      <div className="relative mx-auto w-full max-w-sm">
+      <div className="relative mx-auto w-full max-w-[46rem]">
         <div className="absolute inset-x-5 top-8 h-48 rounded-[2rem] bg-cyan-400/15 blur-3xl" aria-hidden="true" />
         <div className="relative rounded-[1.7rem] border border-white/10 bg-[#060c18]/85 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,.12),0_16px_50px_rgba(0,0,0,.35)] backdrop-blur-xl">
           <Image src="/brand/parable-world-neon-lockup.png" alt="PARABLE WORLD Virtual Ministry Operating System" width={1672} height={941} priority className="h-auto w-full rounded-[1.15rem] border border-cyan-300/10" />
