@@ -16,8 +16,8 @@ describe("Google Mail API error classification", () => {
     expect(isRecoverableGmailHistoryError(new AppError("PROVIDER_UNAVAILABLE", "Google Mail is temporarily unavailable.", { status: 403, providerStatus: "PERMISSION_DENIED", path: "/history" }))).toBe(true);
   });
 
-  it("asks for reconnect when Gmail refuses access", () => {
+  it("explains permission failures without treating them as expired authorization", () => {
     expect(googleMailFailure(403, "PERMISSION_DENIED").forbidden).toBe(true);
-    expect(googleMailFailure(403, "PERMISSION_DENIED").safeMessage).toContain("Reconnect");
+    expect(googleMailFailure(403, "PERMISSION_DENIED").safeMessage).toContain("permissions");
   });
 });

@@ -39,8 +39,9 @@ export function GmailConnectionPanel({
 
   return <details className="my-7 rounded-2xl border border-[#1C283C] bg-[#101828] px-5 py-4">
     {oauthMessage && <p role="status" className="mb-3 rounded-2xl border border-[#1D4E89] bg-[#122033] px-4 py-3 text-sm font-semibold text-[#67E8F9]">{oauthMessage}</p>}
-    <summary className="cursor-pointer text-sm font-semibold text-[#F4F7FB]">Google Mail connected · {availableIdentityCount} verified sender{availableIdentityCount === 1 ? "" : "s"}</summary>
+    <summary className="cursor-pointer text-sm font-semibold text-[#F4F7FB]">Google Mail connected · {availableIdentityCount} verified sender{availableIdentityCount === 1 ? "" : "s"}{connection?.sync_error ? " · sync needs retry" : ""}</summary>
     <p className="mt-3 text-xs text-[#93A0B5]">Provider account: {connection?.provider_account_id}</p>
+    {connection?.sync_error && <p role="status" className="mt-3 text-sm text-[#67E8F9]">The latest sync did not complete. Gmail is still connected; try syncing again. Reconnect only if Google says authorization expired.</p>}
     <div className="mt-4 flex flex-wrap items-center gap-3">
       <Link href={reconnectHref} className="rounded-full border border-[#22D3EE] px-4 py-2 text-xs font-semibold text-[#67E8F9] transition hover:bg-[#122033]">{actionLabel}</Link>
       <p className="text-xs text-[#93A0B5]">Use this if Gmail goes offline or Google asks you to sign in again.</p>

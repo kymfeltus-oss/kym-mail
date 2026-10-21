@@ -1,16 +1,18 @@
 import { AppError } from "@/lib/errors";
 
 const quotaStatuses = new Set(["RESOURCE_EXHAUSTED", "RATE_LIMIT_EXCEEDED"]);
+const quotaReasons = new Set(["userratelimitexceeded", "ratelimitexceeded", "dailylimitexceeded", "quotaexceeded"]);
 const staleHistoryStatuses = new Set(["NOT_FOUND", "FAILED_PRECONDITION", "INVALID_ARGUMENT"]);
 
-export function googleMailFailure(status: number, providerStatus?: string | null) {
+export function googleMailFailure(status: number, providerStatus?: string | null, providerReason?: string | null) {
   const normalizedStatus = providerStatus?.trim() || null;
-  const exhausted = status === 429 || (normalizedStatus !== null && quotaStatuses.has(normalizedStatus));
+  const normalizedReason = providerReason?.trim().toLowerCase().replaceAll("_", "") || null;
+  const exhausted = status === 429 || (normalizedStatus !== null && quotaStatuses.has(normalizedStatus)) || (normalizedReason !== null && quotaReasons.has(normalizedReason));
   const staleHistory = status === 404 || status === 410 || (status === 400 && (normalizedStatus === null || staleHistoryStatuses.has(normalizedStatus)));
   const forbidden = status === 403 && !exhausted;
   let safeMessage = "Google Mail is temporarily unavailable.";
   if (exhausted) safeMessage = "Gmail is busy. Wait a moment, then sync again.";
-  else if (forbidden) safeMessage = "Gmail refused this request. Reconnect Google Mail to restore access.";
+  else if (forbidden) safeMessage = "Google Mail denied this request because of account permissions or Workspace policy.";
   return { exhausted, staleHistory, forbidden, safeMessage, status, providerStatus: normalizedStatus };
 }
 

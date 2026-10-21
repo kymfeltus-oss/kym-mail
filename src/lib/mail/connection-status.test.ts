@@ -15,9 +15,9 @@ const connected = {
 };
 
 describe("Google Mail connection status", () => {
-  it("requires reconnect when Gmail is marked connected but offline with a sync error", () => {
-    expect(googleMailNeedsReconnect({ ...connected, sync_error: "Google Mail is temporarily unavailable." })).toBe(true);
-    expect(googleMailHeadline({ ...connected, sync_error: "Google Mail is temporarily unavailable." })).toBe("Google Mail is offline");
+  it("keeps a connected Gmail account connected after a sync error", () => {
+    expect(googleMailNeedsReconnect({ ...connected, sync_error: "Google Mail is temporarily unavailable." })).toBe(false);
+    expect(googleMailHeadline({ ...connected, sync_error: "Google Mail is temporarily unavailable." })).toBe("Google Mail sync needs attention");
     expect(googleMailActionLabel({ ...connected, sync_error: "Google Mail is temporarily unavailable." })).toBe("Reconnect Google Mail");
   });
 

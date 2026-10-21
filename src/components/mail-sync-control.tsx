@@ -13,16 +13,21 @@ export function MailSyncControl({ connected, initialSyncComplete, lastSyncedAt, 
   const started = useRef(false);
   const [state, setState] = useState<State>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [reconnectRequired, setReconnectRequired] = useState(false);
 
   const synchronize = useCallback(async () => {
-    setState("syncing"); setError(null);
+    setState("syncing"); setError(null); setReconnectRequired(false);
     try {
       const response = await fetch("/api/mail/sync", { method: "POST" });
       const payload = await readApiJson<{ error?: string }>(response);
-      if (!response.ok) throw new Error(payload.error || "Mailbox synchronization could not be completed.");
+      if (!response.ok) {
+        setReconnectRequired(response.status === 401);
+        throw new Error(payload.error || "Mailbox synchronization could not be completed.");
+      }
       setState("complete"); router.refresh();
     } catch (cause) {
       setState("error"); setError(cause instanceof Error ? cause.message : "Mailbox synchronization could not be completed.");
+      router.refresh();
     }
   }, [router]);
 
@@ -43,7 +48,7 @@ export function MailSyncControl({ connected, initialSyncComplete, lastSyncedAt, 
     </p>
     {error && <div className="flex w-full flex-wrap items-center gap-3">
       <p role="alert" className="text-xs text-[#67E8F9]">{error}</p>
-      <Link href="/api/oauth/google/start" className="rounded-full kym-action px-4 py-2 text-xs font-semibold text-white">Reconnect Google Mail</Link>
+      {reconnectRequired && <Link href="/api/oauth/google/start" className="rounded-full kym-action px-4 py-2 text-xs font-semibold text-white">Reconnect Google Mail</Link>}
     </div>}
   </div>;
 }

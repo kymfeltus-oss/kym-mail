@@ -34,6 +34,7 @@ const INITIAL_SYNC_DAYS = 30;
 const INITIAL_SYNC_LIMIT = 100;
 const FETCH_CONCURRENCY = 8;
 const SYNC_LOCK_MS = 90_000;
+const GMAIL_CATCHUP_INTERVAL_MS = 5 * 60 * 1000;
 
 function identityForMessage(message: NormalizedGmailMessage, identities: MailIdentity[]) {
   const candidates = message.isSent
@@ -199,6 +200,35 @@ export async function syncGmailConnection(database: SupabaseClient, connectionId
   } finally {
     await database.from("mail_connections").update({ sync_lock_at: null, updated_at: new Date().toISOString() }).eq("id", connectionId).eq("sync_lock_at", lockStartedAt);
   }
+}
+
+export async function syncStaleGmailConnections(database: SupabaseClient, limit = 5) {
+  const cutoff = new Date(Date.now() - GMAIL_CATCHUP_INTERVAL_MS).toISOString();
+  const { data: connections, error } = await database
+    .from("mail_connections")
+    .select("id, initial_sync_completed_at")
+    .eq("provider", "google")
+    .eq("connection_state", "connected")
+    .or(`last_synced_at.is.null,last_synced_at.lt.${cutoff}`)
+    .or(`sync_error.is.null,updated_at.lt.${cutoff}`)
+    .order("last_synced_at", { ascending: true, nullsFirst: true })
+    .limit(limit);
+  if (error) throw new AppError("INTERNAL", "Connected Gmail accounts could not be checked for new messages.");
+
+  const summary = { checked: connections?.length ?? 0, synced: 0, deferred: 0, failed: 0 };
+  for (const connection of connections ?? []) {
+    try {
+      const result = await syncGmailConnection(database, connection.id, connection.initial_sync_completed_at ? "incremental" : "initial");
+      if (result.deferred) summary.deferred += 1;
+      else summary.synced += 1;
+    } catch (error) {
+      const safeError = toSafeError(error);
+      await database.from("mail_connections").update({ sync_error: safeError.safeMessage, updated_at: new Date().toISOString() }).eq("id", connection.id);
+      log("error", "mail.gmail_cron_sync_failed", { mailConnectionId: connection.id, code: safeError.code });
+      summary.failed += 1;
+    }
+  }
+  return summary;
 }
 
 async function runGmailSync(

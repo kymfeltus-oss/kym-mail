@@ -23,8 +23,7 @@ const oauthErrorCopy: Record<string, string> = {
 
 export function googleMailNeedsReconnect(connection: GoogleMailConnection) {
   if (!connection) return true;
-  if (connection.connection_state !== "connected") return true;
-  return Boolean(connection.sync_error?.trim());
+  return connection.connection_state !== "connected";
 }
 
 export function googleMailActionLabel(connection: GoogleMailConnection) {
@@ -38,7 +37,7 @@ export function googleMailHeadline(connection: GoogleMailConnection) {
   if (connection.connection_state === "reauth_required") return "Reconnect Google Mail";
   if (connection.connection_state === "error") return "Google Mail needs attention";
   if (connection.connection_state === "connecting") return "Finish Google Mail connection";
-  if (connection.sync_error) return "Google Mail is offline";
+  if (connection.sync_error) return "Google Mail sync needs attention";
   return "Connect Google Mail";
 }
 
@@ -49,7 +48,7 @@ export function googleMailBody(connection: GoogleMailConnection) {
   if (connection.connection_state === "reauth_required") return "Google authorization is no longer usable. Reconnect securely to resume synchronization and sending.";
   if (connection.connection_state === "error") return "The provider connection could not be used. Reconnect Google Mail to recover safely.";
   if (connection.connection_state === "connecting") return "Google authorization was started but not finished. Reconnect to complete setup.";
-  if (connection.sync_error) return "Gmail is not usable right now. Reconnect to restore synchronization and sending.";
+  if (connection.sync_error) return "Google Mail is still connected, but the latest sync did not complete. Try syncing again; reconnect only if Google says authorization expired.";
   return "Authorize the private Gmail provider to synchronize and send through your verified KYM Mail identities.";
 }
 

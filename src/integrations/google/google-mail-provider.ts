@@ -9,6 +9,7 @@ import type { MailProvider, OutgoingMail, ProviderSendResult } from "@/domain/pr
 
 type ConnectionTokens = { id: string; encrypted_access_token: string | null; encrypted_refresh_token: string | null; token_expires_at: string | null };
 type GoogleError = { error?: { code?: number; status?: string; errors?: Array<{ reason?: string }> } };
+type GoogleTokenResponse = { access_token?: string; expires_in?: number; error?: string; error_description?: string };
 
 export type GoogleDriveFile = {
   id: string;
@@ -35,9 +36,23 @@ export class GoogleMailProvider implements MailProvider {
     if (this.connection.encrypted_access_token && this.connection.token_expires_at && new Date(this.connection.token_expires_at).getTime() > Date.now() + 60_000) return decryptToken(this.connection.encrypted_access_token);
     if (!this.connection.encrypted_refresh_token) return this.requireReauthorization();
     const env = getGoogleMailEnv();
-    const response = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: env.GOOGLE_CLIENT_ID, client_secret: env.GOOGLE_CLIENT_SECRET, refresh_token: decryptToken(this.connection.encrypted_refresh_token), grant_type: "refresh_token" }) });
-    if (!response.ok) return this.requireReauthorization();
-    const token = await response.json() as { access_token: string; expires_in: number };
+    let response: Response;
+    try {
+      response = await fetch("https://oauth2.googleapis.com/token", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ client_id: env.GOOGLE_CLIENT_ID, client_secret: env.GOOGLE_CLIENT_SECRET, refresh_token: decryptToken(this.connection.encrypted_refresh_token), grant_type: "refresh_token" }) });
+    } catch (error) {
+      log("error", "mail.google_token_refresh_failed", { reason: error instanceof Error ? error.name : "unknown" });
+      throw new AppError("PROVIDER_UNAVAILABLE", "Google authorization is temporarily unavailable. Try syncing again shortly.");
+    }
+    const token = await response.json().catch(() => ({})) as GoogleTokenResponse;
+    if (!response.ok) {
+      if (token.error === "invalid_grant") return this.requireReauthorization();
+      log("error", "mail.google_token_refresh_failed", { status: response.status, providerError: token.error ?? "unknown" });
+      throw new AppError("PROVIDER_UNAVAILABLE", "Google authorization is temporarily unavailable. Try syncing again shortly.", { status: response.status, providerStatus: token.error ?? null });
+    }
+    if (!token.access_token || typeof token.expires_in !== "number" || !Number.isFinite(token.expires_in) || token.expires_in <= 0) {
+      log("error", "mail.google_token_refresh_failed", { status: response.status, providerError: "invalid_token_response" });
+      throw new AppError("PROVIDER_UNAVAILABLE", "Google authorization returned an invalid response. Try syncing again shortly.");
+    }
     const expiresAt = new Date(Date.now() + token.expires_in * 1000);
     const encrypted = encryptToken(token.access_token);
     const { error } = await this.database.from("mail_connection_credentials").update({ encrypted_access_token: encrypted, token_expires_at: expiresAt.toISOString(), updated_at: new Date().toISOString() }).eq("mail_connection_id", this.connection.id);
@@ -58,9 +73,10 @@ export class GoogleMailProvider implements MailProvider {
     if (!response.ok) {
       const body = await response.json().catch(() => ({})) as GoogleError;
       const requestPath = path.split("?")[0] || path;
-      const failure = googleMailFailure(response.status, body.error?.status);
-      log("error", "mail.google_api_failed", { status: failure.status, providerStatus: failure.providerStatus, path: requestPath });
-      if (failure.forbidden && (requestPath === "/profile" || requestPath === "/messages")) return this.requireReauthorization();
+      const reason = body.error?.errors?.[0]?.reason;
+      const failure = googleMailFailure(response.status, body.error?.status, reason);
+      log("error", "mail.google_api_failed", { status: failure.status, providerStatus: failure.providerStatus, providerReason: reason ?? null, path: requestPath });
+      if (response.status === 403 && reason === "insufficientPermissions") return this.requireReauthorization();
       throw new AppError("PROVIDER_UNAVAILABLE", failure.safeMessage, { status: failure.status, providerStatus: failure.providerStatus, path: requestPath });
     }
     return response.json() as Promise<T>;
@@ -73,8 +89,9 @@ export class GoogleMailProvider implements MailProvider {
       const body = await response.json().catch(() => ({})) as GoogleError;
       const insufficientScope = response.status === 403 && body.error?.errors?.some((item) => item.reason === "insufficientPermissions");
       if (insufficientScope) throw new AppError("UNAUTHORIZED", "Reconnect Google Mail and approve Google Drive access to upload large files.");
-      const failure = googleMailFailure(response.status, body.error?.status);
-      log("error", "mail.google_drive_api_failed", { status: failure.status, providerStatus: failure.providerStatus, path: path.split("?")[0] });
+      const reason = body.error?.errors?.[0]?.reason;
+      const failure = googleMailFailure(response.status, body.error?.status, reason);
+      log("error", "mail.google_drive_api_failed", { status: failure.status, providerStatus: failure.providerStatus, providerReason: reason ?? null, path: path.split("?")[0] });
       throw new AppError("PROVIDER_UNAVAILABLE", response.status === 403 ? "Google Drive could not share this file. Check your account's sharing settings." : failure.safeMessage, { status: failure.status, providerStatus: failure.providerStatus });
     }
     return response.json() as Promise<T>;
@@ -100,8 +117,9 @@ export class GoogleMailProvider implements MailProvider {
       const body = await response.json().catch(() => ({})) as GoogleError;
       const insufficientScope = response.status === 403 && body.error?.errors?.some((item) => item.reason === "insufficientPermissions");
       if (insufficientScope) throw new AppError("UNAUTHORIZED", "Reconnect Google Mail and approve Google Drive access to upload large files.");
-      const failure = googleMailFailure(response.status, body.error?.status);
-      log("error", "mail.google_drive_upload_start_failed", { status: failure.status, providerStatus: failure.providerStatus });
+      const reason = body.error?.errors?.[0]?.reason;
+      const failure = googleMailFailure(response.status, body.error?.status, reason);
+      log("error", "mail.google_drive_upload_start_failed", { status: failure.status, providerStatus: failure.providerStatus, providerReason: reason ?? null });
       throw new AppError("PROVIDER_UNAVAILABLE", failure.safeMessage, { status: failure.status, providerStatus: failure.providerStatus });
     }
     const sessionUrl = response.headers.get("location");
