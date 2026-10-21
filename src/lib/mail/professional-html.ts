@@ -196,6 +196,11 @@ export function buildProfessionalEmailHtml({
 }) {
   const selected = look ?? defaultEmailLookForSender(from);
   const theme = allLooks[selected];
+  // Gmail's iOS app may otherwise invert a dark brand email when the recipient
+  // uses dark mode. Keep the Parable palette intact for Gmail/Workspace inboxes.
+  const colorScheme = selected === "parable" || selected === "parable-motion"
+    ? '<meta name="color-scheme" content="light only">'
+    : "";
   const content = formatMessageHtml(body, selected) || `<p style="margin:0;${theme.body}">${escapeHtml(body)}</p>`;
   const logoPath = emailLogoAssetForLook(selected)?.path ?? ("mastheadImage" in theme ? theme.mastheadImage : "");
   const logoBase = process.env.APP_URL?.trim().replace(/\/$/, "") ?? "";
@@ -209,6 +214,7 @@ export function buildProfessionalEmailHtml({
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+${colorScheme}
 <title>${escapeHtml(subject)}</title>
 </head>
 <body bgcolor="${theme.page}" style="margin:0;padding:0;background-color:${theme.page}">
