@@ -5,7 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CalendarClock, Paperclip, Send, X, CloudUpload, Check, LoaderCircle, FileVideo2, RefreshCw } from "lucide-react";
-import { Image } from "lucide-react";
+import { Image as ImageIcon } from "lucide-react";
 import { readApiJson } from "@/lib/http/read-api-json";
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_COUNT, MAX_TOTAL_ATTACHMENT_BYTES, validateAttachmentEntries } from "@/lib/mail/attachment-validation";
 import { composeAttachmentBucket } from "@/lib/scheduling/constants";
@@ -418,7 +418,7 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
         <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#93A0B5]">Delivery format</p>
         <div className="mt-3 flex flex-wrap gap-2">
           <button type="button" aria-pressed={renderMode === "standard"} onClick={() => setRenderMode("standard")} className={`rounded-full border px-4 py-2 text-sm font-semibold ${renderMode === "standard" ? "border-[#22D3EE] bg-[#122033] text-[#67E8F9]" : "border-[#26384C] text-[#93A0B5]"}`}>Standard HTML</button>
-          <button type="button" aria-pressed={renderMode === "pixel-perfect"} onClick={() => setRenderMode("pixel-perfect")} className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold ${renderMode === "pixel-perfect" ? "border-[#22D3EE] bg-[#122033] text-[#67E8F9]" : "border-[#26384C] text-[#93A0B5]"}`}><Image className="size-4" /> Pixel Perfect</button>
+          <button type="button" aria-pressed={renderMode === "pixel-perfect"} onClick={() => setRenderMode("pixel-perfect")} className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold ${renderMode === "pixel-perfect" ? "border-[#22D3EE] bg-[#122033] text-[#67E8F9]" : "border-[#26384C] text-[#93A0B5]"}`}><ImageIcon className="size-4" /> Pixel Perfect</button>
         </div>
         <p className="mt-3 text-xs leading-5 text-[#93A0B5]">{renderMode === "pixel-perfect" ? "The full preview is sent as a high-resolution image. Recipients can open it at full size or read its accessible text version. Text inside the image cannot be selected or copied." : "Live text reflows to each screen and stays selectable. Some inboxes may adjust colors or spacing."}</p>
         {renderMode === "pixel-perfect" && look === "parable-motion" && <p className="mt-2 text-xs leading-5 text-[#F6C66B]">This mode captures the current frame of the Parable Motion GIF. Choose Standard HTML to keep the logo animated.</p>}

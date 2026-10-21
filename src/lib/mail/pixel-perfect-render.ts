@@ -37,7 +37,7 @@ export async function renderEmailDocumentToPng(frame: HTMLIFrameElement) {
   }
 
   const clonedBody = emailDocument.body.cloneNode(true) as HTMLBodyElement;
-  const clonedImages = [...clonedBody.images];
+  const clonedImages = [...clonedBody.querySelectorAll("img")];
   await Promise.all(sourceImages.map(async (image, index) => {
     const source = image.currentSrc || image.src;
     if (!source || source.startsWith("data:")) return;
