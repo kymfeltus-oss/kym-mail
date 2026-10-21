@@ -7,6 +7,9 @@ import { attachmentSha256 } from "@/lib/mail/attachment-hash";
 import { MAX_ATTACHMENT_COUNT, validateAttachmentEntries, validateAttachmentFiles } from "@/lib/mail/attachment-validation";
 import { validateComposeInput } from "@/lib/mail/compose-validation";
 import { loadForwardedAttachments, parseForwardAttachmentIds } from "@/lib/mail/forwarded-attachments";
+import { defaultEmailLookForSender, isEmailLook, pixelPerfectAccessibleText } from "@/lib/mail/professional-html";
+import { emailDesignFilename, emailDesignImageMaxBytes, validPngFile } from "@/lib/mail/email-design-constants";
+import { createEmailDesignShare, hasPngSignature, removeEmailDesignShareByHash, type EmailDesignShare } from "@/lib/mail/email-design-share";
 import { requireScheduledIdentity, resolveScheduledProject } from "@/lib/scheduling/access";
 import { composeAttachmentBucket, scheduledAttachmentBucket, scheduledRfcMessageId } from "@/lib/scheduling/constants";
 import { validateScheduleTiming } from "@/lib/scheduling/validation";
@@ -33,6 +36,7 @@ export async function POST(request: NextRequest) {
   const uploadedPaths: string[] = [];
   const stagedPaths: string[] = [];
   let scheduledId: string | null = null;
+  let emailDesignShare: EmailDesignShare | null = null;
   try {
     const form = await request.formData();
     const stagedRefs = parseStagedAttachmentRefs(form.get("uploadedAttachments"), owner.user.id);
@@ -84,6 +88,23 @@ export async function POST(request: NextRequest) {
     const sharedDriveFiles = await shareDriveFilesForEmail(provider, owner.user.id, identity.mail_connection_id, driveFileIds);
     const body = appendDriveLinkSection(input.body, sharedDriveFiles);
     scheduledId = crypto.randomUUID();
+    const accessibleText = pixelPerfectAccessibleText(input.from, body, emailLook);
+    const pixelPerfect = form.get("renderMode") === "pixel-perfect";
+    const pixelImageFile = form.get("pixelPerfectImage");
+    if (pixelPerfect && !validPngFile(pixelImageFile)) throw new ValidationError("The Pixel Perfect image could not be prepared. Choose Standard HTML or try again.");
+    const pixelImage = pixelPerfect && validPngFile(pixelImageFile) ? new Uint8Array(await pixelImageFile.arrayBuffer()) : null;
+    if (pixelImage && (!hasPngSignature(pixelImage) || pixelImage.byteLength > emailDesignImageMaxBytes)) throw new ValidationError("The Pixel Perfect image is invalid or too large. Try again or choose Standard HTML.");
+    if (pixelImage && !validateAttachmentEntries([
+      ...driveFileIds.map((_, index) => ({ name: `drive-link-${index + 1}`, size: 1 })),
+      ...forwardedAttachments.map((attachment) => ({ name: attachment.filename, size: attachment.content.byteLength })),
+      ...uploadedAttachments.map((attachment) => ({ name: attachment.filename, size: attachment.content.byteLength })),
+      { name: emailDesignFilename, size: pixelImage.byteLength }
+    ])) throw new ValidationError("Pixel Perfect adds an image to the 18 MB message limit. Remove attachments or choose Standard HTML.");
+    if (pixelImage) {
+      const baseUrl = process.env.APP_URL?.trim() || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : request.nextUrl.origin);
+      const expiresAt = new Date(new Date(timing.scheduledFor).getTime() + 90 * 24 * 60 * 60 * 1000).toISOString();
+      emailDesignShare = await createEmailDesignShare({ database, ownerId: owner.user.id, image: pixelImage, subject: input.subject, from: input.from, textBody: accessibleText, baseUrl, expiresAt });
+    }
     const attachments = [] as Array<{ id: string; owner_id: string; scheduled_message_id: string; object_path: string; filename: string; mime_type: string; size_bytes: number; sha256: string }>;
     for (const file of [...forwardedAttachments, ...uploadedAttachments]) {
       const content = file.content;
@@ -109,6 +130,9 @@ export async function POST(request: NextRequest) {
       subject: input.subject,
       text_body: body,
       email_look: emailLook,
+      is_pixel_perfect: pixelPerfect,
+      email_design_share_token_hash: emailDesignShare?.tokenHash ?? null,
+      email_design_share_url: emailDesignShare?.url ?? null,
       scheduled_for: timing.scheduledFor,
       next_attempt_at: timing.scheduledFor,
       timezone: timing.timezone
@@ -123,6 +147,9 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (scheduledId) await database.from("scheduled_messages").delete().eq("id", scheduledId);
     if (uploadedPaths.length) await database.storage.from(scheduledAttachmentBucket).remove(uploadedPaths);
+    if (emailDesignShare) {
+      try { await removeEmailDesignShareByHash(database, emailDesignShare.tokenHash); } catch { /* The unguessable share remains access-limited and expires. */ }
+    }
     const safeError = toSafeError(error);
     const validationFailure = error instanceof z.ZodError || safeError.code === "VALIDATION";
     log("error", "mail.schedule_create_failed", { code: safeError.code });

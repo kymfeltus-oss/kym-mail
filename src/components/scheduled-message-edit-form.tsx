@@ -6,7 +6,7 @@ import { EmailBodyEditor } from "@/components/email-body-editor";
 
 type Identity = { id: string; email_address: string; label: string };
 type Project = { id: string; name: string };
-type Message = { id: string; mail_account_id: string; project_id: string | null; to_addresses: string[]; cc_addresses: string[]; bcc_addresses: string[]; subject: string; text_body: string; version: number };
+type Message = { id: string; mail_account_id: string; project_id: string | null; to_addresses: string[]; cc_addresses: string[]; bcc_addresses: string[]; subject: string; text_body: string; version: number; is_pixel_perfect?: boolean };
 
 export function ScheduledMessageEditForm({ message, identities, projects, attachmentCount }: { message: Message; identities: Identity[]; projects: Project[]; attachmentCount: number }) {
   const router = useRouter();
@@ -28,6 +28,7 @@ export function ScheduledMessageEditForm({ message, identities, projects, attach
 
   return <form onSubmit={submit} className="glass rounded-3xl p-5 sm:p-8">
     <input type="hidden" name="version" value={message.version} />
+    {message.is_pixel_perfect && <p className="mb-5 rounded-2xl border border-[#75581E] bg-[#332811] px-4 py-3 text-xs leading-5 text-[#F6C66B]">This email was scheduled as a Pixel Perfect image. Saving edits creates a new Standard HTML version so the delivered content stays in sync with your changes.</p>}
     <div className="grid gap-5">
       <label className="grid gap-2 text-sm font-semibold text-[#F4F7FB]">Project<select name="projectId" defaultValue={message.project_id ?? ""} className="rounded-xl border border-[#1C283C] bg-[#101828] px-4 py-3 font-normal"><option value="">None</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select></label>
       <label className="grid gap-2 text-sm font-semibold text-[#F4F7FB]">From<select name="from" defaultValue={identities.find((identity) => identity.id === message.mail_account_id)?.email_address ?? ""} required className="rounded-xl border border-[#1C283C] bg-[#101828] px-4 py-3 font-normal">{identities.map((identity) => <option key={identity.id} value={identity.email_address}>{identity.email_address} — {identity.label}</option>)}</select></label>

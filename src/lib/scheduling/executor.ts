@@ -6,7 +6,9 @@ import { loadGoogleProvider, syncGmailMessageById } from "@/lib/mail/gmail-sync"
 import { loadInlineEmailLogo } from "@/lib/mail/inline-email-assets";
 import { advanceOutreachAfterSend, guardOutreachSend } from "@/lib/mail/outreach";
 import { scheduledAttachmentBucket } from "@/lib/scheduling/constants";
-import { buildProfessionalEmailHtml, defaultEmailLookForSender, isEmailLook, type EmailLook } from "@/lib/mail/professional-html";
+import { buildPixelPerfectEmailHtml, buildProfessionalEmailHtml, defaultEmailLookForSender, isEmailLook, type EmailLook } from "@/lib/mail/professional-html";
+import { emailDesignContentId, emailDesignFilename } from "@/lib/mail/email-design-constants";
+import { loadEmailDesignShareByHash } from "@/lib/mail/email-design-share";
 
 type ScheduledRecord = {
   id: string;
@@ -22,6 +24,9 @@ type ScheduledRecord = {
   subject: string;
   text_body: string;
   email_look: EmailLook | null;
+  is_pixel_perfect: boolean;
+  email_design_share_token_hash: string | null;
+  email_design_share_url: string | null;
   processing_token: string;
   attempt_count: number;
   max_attempts: number;
@@ -190,21 +195,38 @@ export async function executeDueScheduledMessages(database: SupabaseClient): Pro
         result = { messageId: existing[0].messageId, threadId: existing[0].threadId };
       } else {
         const look = isEmailLook(record.email_look) ? record.email_look : defaultEmailLookForSender(identity.email_address);
-        const inlineImages = await loadInlineEmailLogo(look);
+        let inlineImages: Awaited<ReturnType<typeof loadInlineEmailLogo>>;
+        let htmlBody: string;
+        let textBody = record.text_body;
+        if (record.is_pixel_perfect) {
+          if (!record.email_design_share_token_hash || !record.email_design_share_url) throw new AppError("CONFIGURATION", "The Pixel Perfect design is unavailable.");
+          const design = await loadEmailDesignShareByHash(database, record.email_design_share_token_hash);
+          if (!design) throw new AppError("CONFIGURATION", "The Pixel Perfect design is unavailable.");
+          inlineImages = [{ contentId: emailDesignContentId, filename: emailDesignFilename, mimeType: "image/png", content: design.image }];
+          htmlBody = buildPixelPerfectEmailHtml({
+            imageSource: `cid:${emailDesignContentId}`,
+            imageAlt: `Subject: ${record.subject}. Message text: ${design.share.text_body.slice(0, 4000)}`,
+            viewUrl: record.email_design_share_url
+          });
+          textBody = `${design.share.text_body}\n\nView the full design: ${record.email_design_share_url}`;
+        } else {
+          inlineImages = await loadInlineEmailLogo(look);
+          htmlBody = buildProfessionalEmailHtml({
+            from: identity.email_address,
+            subject: record.subject,
+            body: record.text_body,
+            look,
+            logoImageSource: inlineImages[0] ? `cid:${inlineImages[0].contentId}` : undefined
+          });
+        }
         result = await provider.send({
           from: identity.email_address,
           to: record.to_addresses,
           cc: record.cc_addresses,
           bcc: record.bcc_addresses,
           subject: record.subject,
-          textBody: record.text_body,
-          htmlBody: buildProfessionalEmailHtml({
-            from: identity.email_address,
-            subject: record.subject,
-            body: record.text_body,
-            look,
-            logoImageSource: inlineImages[0] ? `cid:${inlineImages[0].contentId}` : undefined
-          }),
+          textBody,
+          htmlBody,
           inlineImages,
           attachments: await storedAttachments(database, record),
           messageId: record.rfc_message_id,

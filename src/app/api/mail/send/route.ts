@@ -5,7 +5,9 @@ import { log } from "@/lib/logger";
 import { MAX_ATTACHMENT_COUNT, validateAttachmentEntries, validateAttachmentFiles } from "@/lib/mail/attachment-validation";
 import { validateComposeInput } from "@/lib/mail/compose-validation";
 import { loadInlineEmailLogo } from "@/lib/mail/inline-email-assets";
-import { buildProfessionalEmailHtml, defaultEmailLookForSender, isEmailLook } from "@/lib/mail/professional-html";
+import { buildPixelPerfectEmailHtml, buildProfessionalEmailHtml, defaultEmailLookForSender, isEmailLook, pixelPerfectAccessibleText } from "@/lib/mail/professional-html";
+import { emailDesignContentId, emailDesignFilename, validPngFile } from "@/lib/mail/email-design-constants";
+import { createEmailDesignShare, hasPngSignature, removeEmailDesignShareByHash, type EmailDesignShare } from "@/lib/mail/email-design-share";
 import { loadForwardedAttachments, parseForwardAttachmentIds } from "@/lib/mail/forwarded-attachments";
 import { loadGoogleProvider, syncGmailMessageById } from "@/lib/mail/gmail-sync";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -25,6 +27,8 @@ export async function POST(request: NextRequest) {
 
   const stagedPaths: string[] = [];
   let database: ReturnType<typeof createSupabaseAdminClient> | null = null;
+  let emailDesignShare: EmailDesignShare | null = null;
+  let deliveryCompleted = false;
   try {
     const form = await request.formData();
     database = createSupabaseAdminClient();
@@ -95,20 +99,43 @@ export async function POST(request: NextRequest) {
     const body = appendDriveLinkSection(input.body, sharedDriveFiles);
     const rawLook = form.get("emailLook");
     const look = isEmailLook(rawLook) ? rawLook : defaultEmailLookForSender(input.from);
-    const inlineImages = await loadInlineEmailLogo(look);
+    const pixelPerfect = form.get("renderMode") === "pixel-perfect";
+    const pixelImageFile = form.get("pixelPerfectImage");
+    if (pixelPerfect && !validPngFile(pixelImageFile)) throw new ValidationError("The Pixel Perfect image could not be prepared. Choose Standard HTML or try again.");
+    const pixelImage = pixelPerfect && validPngFile(pixelImageFile) ? new Uint8Array(await pixelImageFile.arrayBuffer()) : null;
+    if (pixelImage && !hasPngSignature(pixelImage)) throw new ValidationError("The Pixel Perfect image is invalid. Try again or choose Standard HTML.");
+    if (pixelImage && !validateAttachmentEntries([
+      ...driveFileIds.map((_, index) => ({ name: `drive-link-${index + 1}`, size: 1 })),
+      ...forwardedAttachments.map((attachment) => ({ name: attachment.filename, size: attachment.content.byteLength })),
+      ...uploadedAttachments.map((attachment) => ({ name: attachment.filename, size: attachment.content.byteLength })),
+      { name: emailDesignFilename, size: pixelImage.byteLength }
+    ])) throw new ValidationError("Pixel Perfect adds an image to the 18 MB message limit. Remove attachments or choose Standard HTML.");
+    const accessibleText = pixelPerfectAccessibleText(input.from, body, look);
+    if (pixelImage) {
+      const baseUrl = process.env.APP_URL?.trim() || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : request.nextUrl.origin);
+      emailDesignShare = await createEmailDesignShare({ database, ownerId: owner.user.id, image: pixelImage, subject: input.subject, from: input.from, textBody: accessibleText, baseUrl });
+    }
+    const inlineImages = pixelImage
+      ? [{ contentId: emailDesignContentId, filename: emailDesignFilename, mimeType: "image/png", content: pixelImage }]
+      : await loadInlineEmailLogo(look);
+    const textBody = emailDesignShare ? `${accessibleText}\n\nView the full design: ${emailDesignShare.url}` : body;
+    const htmlBody = emailDesignShare
+      ? buildPixelPerfectEmailHtml({ imageSource: `cid:${emailDesignContentId}`, imageAlt: `Subject: ${input.subject}. Message text: ${accessibleText.slice(0, 4000)}`, viewUrl: emailDesignShare.url })
+      : buildProfessionalEmailHtml({ from: input.from, subject: input.subject, body, look, logoImageSource: inlineImages[0] ? `cid:${inlineImages[0].contentId}` : undefined });
     const result = await provider.send({
       from: input.from,
       to: input.to,
       cc: input.cc,
       bcc: input.bcc,
       subject: input.subject,
-      textBody: body,
-      htmlBody: buildProfessionalEmailHtml({ from: input.from, subject: input.subject, body, look, logoImageSource: inlineImages[0] ? `cid:${inlineImages[0].contentId}` : undefined }),
+      textBody,
+      htmlBody,
       threadId: input.providerThreadId,
       replyToMessageId: input.replyToMessageId,
       inlineImages,
       attachments: [...forwardedAttachments, ...uploadedAttachments]
     });
+    deliveryCompleted = true;
 
     let synchronized = true;
     try { await syncGmailMessageById(database, identity.mail_connection_id, result.messageId, projectId); }
@@ -116,6 +143,9 @@ export async function POST(request: NextRequest) {
     log("info", "mail.message_sent", { mailConnectionId: identity.mail_connection_id, synchronized, attachmentCount: uploadedAttachments.length + forwardedAttachments.length, driveLinkCount: sharedDriveFiles.length, projectAssociated: Boolean(projectId), forwardedAttachmentCount: forwardedAttachments.length });
     return NextResponse.json({ sent: true, synchronized, messageId: result.messageId, threadId: result.threadId }, { status: synchronized ? 200 : 202 });
   } catch (error) {
+    if (emailDesignShare && !deliveryCompleted) {
+      try { if (database) await removeEmailDesignShareByHash(database, emailDesignShare.tokenHash); } catch { /* The unguessable share remains access-limited and expires. */ }
+    }
     const safeError = toSafeError(error);
     log("error", "mail.message_send_failed", { code: safeError.code });
     const validationFailure = error instanceof z.ZodError || safeError.code === "VALIDATION";

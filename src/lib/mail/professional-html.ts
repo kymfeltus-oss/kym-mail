@@ -180,6 +180,11 @@ export function formatMessageHtml(body: string, look: EmailLook = "personal") {
   }).join("");
 }
 
+export function pixelPerfectAccessibleText(from: string, body: string, look: EmailLook) {
+  const company = emailLooks.find((item) => item.id === look)?.company;
+  return [body.trim(), ownerSignature.name, company, from, ownerSignature.phone].filter(Boolean).join("\n");
+}
+
 export function buildProfessionalEmailHtml({
   from,
   subject,
@@ -239,6 +244,38 @@ ${colorScheme}
       </table>
     </td>
   </tr>
+</table>
+</body>
+</html>`;
+}
+
+export function buildPixelPerfectEmailHtml({ imageSource, imageAlt, viewUrl }: {
+  imageSource: string;
+  imageAlt: string;
+  viewUrl: string;
+}) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light only">
+<title>Email design</title>
+</head>
+<body bgcolor="#F4F7FB" style="margin:0;padding:0;background-color:#F4F7FB">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#F4F7FB" style="background-color:#F4F7FB;padding:24px 8px;border-collapse:collapse">
+  <tr><td align="center">
+    <table role="presentation" width="624" cellspacing="0" cellpadding="0" style="max-width:624px;width:100%;border-collapse:collapse">
+      <tr><td align="center" style="padding:0">
+        <a href="${escapeHtml(viewUrl)}" style="display:block;text-decoration:none">
+          <img src="${escapeHtml(imageSource)}" alt="${escapeHtml(imageAlt)}" width="624" style="display:block;width:100%;max-width:624px;height:auto;border:0" />
+        </a>
+      </td></tr>
+      <tr><td align="center" style="padding:14px 8px 4px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:#52657A">
+        <a href="${escapeHtml(viewUrl)}" style="color:#1D4ED8;text-decoration:underline">View the full design and accessible text version</a>
+      </td></tr>
+    </table>
+  </td></tr>
 </table>
 </body>
 </html>`;

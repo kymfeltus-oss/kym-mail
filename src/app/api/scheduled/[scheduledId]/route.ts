@@ -6,6 +6,7 @@ import { validateComposeInput } from "@/lib/mail/compose-validation";
 import { requireScheduledIdentity, resolveScheduledProject } from "@/lib/scheduling/access";
 import { scheduledEditSchema, scheduledMutationSchema, validateScheduleTiming } from "@/lib/scheduling/validation";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { removeEmailDesignShareByHash, updateEmailDesignShareExpiry } from "@/lib/mail/email-design-share";
 
 async function context(request: NextRequest, scheduledId: string) {
   const owner = await getOwnerContext();
@@ -41,10 +42,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       bcc_addresses: input.bcc,
       subject: input.subject,
       text_body: input.body,
+      is_pixel_perfect: false,
+      email_design_share_token_hash: null,
+      email_design_share_url: null,
       version: message.version + 1,
       updated_at: new Date().toISOString()
     }).eq("id", message.id).eq("owner_id", owner.user.id).eq("status", "SCHEDULED").eq("version", message.version).select("id, version").maybeSingle();
     if (error || !updated) return NextResponse.json({ error: "This email is already being processed or changed." }, { status: 409 });
+    if (message.email_design_share_token_hash) await removeEmailDesignShareByHash(database, message.email_design_share_token_hash);
     return NextResponse.json({ updated: true, version: updated.version });
   } catch (error) {
     const safe = toSafeError(error);
@@ -76,6 +81,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       if (!timing) throw new ValidationError("Choose a valid future delivery date and time.");
       const { data, error } = await database.from("scheduled_messages").update({ scheduled_for: timing.scheduledFor, next_attempt_at: timing.scheduledFor, timezone: timing.timezone, attempt_count: 0, last_error_code: null, last_error_message: null, version: message.version + 1, updated_at: new Date().toISOString() }).eq("id", message.id).eq("owner_id", owner.user.id).eq("status", "SCHEDULED").eq("version", message.version).select("version").maybeSingle();
       if (error || !data) return NextResponse.json({ error: "This email is already being processed or changed." }, { status: 409 });
+      if (message.email_design_share_token_hash) await updateEmailDesignShareExpiry(database, message.email_design_share_token_hash, new Date(new Date(timing.scheduledFor).getTime() + 90 * 24 * 60 * 60 * 1000).toISOString());
       return NextResponse.json({ rescheduled: true, version: data.version });
     }
 
@@ -85,6 +91,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const now = new Date().toISOString();
     const { data, error } = await database.from("scheduled_messages").update({ status: "SCHEDULED", scheduled_for: now, next_attempt_at: now, attempt_count: 0, processing_token: null, claimed_at: null, last_error_code: null, last_error_message: null, version: message.version + 1, updated_at: now }).eq("id", message.id).eq("owner_id", owner.user.id).eq("status", "FAILED").eq("version", message.version).select("version").maybeSingle();
     if (error || !data) return NextResponse.json({ error: "This email is already being processed or changed." }, { status: 409 });
+    if (message.email_design_share_token_hash) await updateEmailDesignShareExpiry(database, message.email_design_share_token_hash, new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString());
     return NextResponse.json({ retryQueued: true, version: data.version });
   } catch (error) {
     const safe = toSafeError(error);

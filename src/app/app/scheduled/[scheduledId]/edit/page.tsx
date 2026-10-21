@@ -11,7 +11,7 @@ export default async function EditScheduledMessagePage({ params }: { params: Pro
   const owner = await getOwnerContext();
   if (!owner?.user.email) redirect("/sign-in");
   const { scheduledId } = await params;
-  const { data: message, error } = await owner.database.from("scheduled_messages").select("id, mail_account_id, project_id, to_addresses, cc_addresses, bcc_addresses, subject, text_body, status, version").eq("id", scheduledId).eq("owner_id", owner.user.id).maybeSingle();
+  const { data: message, error } = await owner.database.from("scheduled_messages").select("id, mail_account_id, project_id, to_addresses, cc_addresses, bcc_addresses, subject, text_body, status, version, is_pixel_perfect").eq("id", scheduledId).eq("owner_id", owner.user.id).maybeSingle();
   if (error) throw new Error("SCHEDULED_MAIL_UNAVAILABLE");
   if (!message || message.status !== "SCHEDULED") notFound();
   const [{ data: identities, error: identitiesError }, { data: projects, error: projectsError }, { count: attachmentCount, error: attachmentError }] = await Promise.all([

@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CalendarClock, Paperclip, Send, X, CloudUpload, Check, LoaderCircle, FileVideo2, RefreshCw } from "lucide-react";
+import { Image } from "lucide-react";
 import { readApiJson } from "@/lib/http/read-api-json";
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_COUNT, MAX_TOTAL_ATTACHMENT_BYTES, validateAttachmentEntries } from "@/lib/mail/attachment-validation";
 import { composeAttachmentBucket } from "@/lib/scheduling/constants";
@@ -12,6 +13,7 @@ import { EmailBodyEditor } from "@/components/email-body-editor";
 import { buildProfessionalEmailHtml, defaultEmailLookForSender, emailLogoAssetForLook, emailLookChrome, emailLooks, isEmailLook, type EmailLook } from "@/lib/mail/professional-html";
 import { appendDriveLinkSection } from "@/lib/mail/drive-link-attachments";
 import { blockedAttachmentPattern } from "@/lib/mail/compose-validation";
+import { attachPixelPerfectImage } from "@/lib/mail/pixel-perfect-compose";
 
 export type ComposeIdentity = { id: string; email_address: string; label: string; is_default: boolean };
 export type ComposeProject = { id: string; name: string; default_mail_account_id: string | null };
@@ -203,6 +205,8 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
   const [status, setStatus] = useState<"idle" | "sending" | "scheduling" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [renderMode, setRenderMode] = useState<"standard" | "pixel-perfect">("standard");
+  const previewFrameRef = useRef<HTMLIFrameElement>(null);
   const [scheduledLocal, setScheduledLocal] = useState(() => localInputValue(new Date(Date.now() + 5 * 60_000)));
   const [timezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Chicago");
   const [body, setBody] = useState(draft?.body ?? "");
@@ -274,10 +278,11 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
       data.set("driveFileIds", JSON.stringify(await uploadPendingDriveFiles()));
       staged = await uploadComposeAttachments(files);
       data.set("uploadedAttachments", JSON.stringify(staged));
+      await attachPixelPerfectImage(data, previewFrameRef.current, renderMode);
       const response = await fetch("/api/mail/send", { method: "POST", body: data });
       const payload = await readApiJson<{ error?: string; sent?: boolean }>(response);
       if (!response.ok && !payload.sent) throw new Error(payload.error || "The message could not be sent.");
-      formRef.current?.reset(); setFiles([]); setDriveFiles([]); setForwardedAttachments([]); setBody(""); setSubject(""); onSent?.();
+      formRef.current?.reset(); setFiles([]); setDriveFiles([]); setForwardedAttachments([]); setBody(""); setSubject(""); setRenderMode("standard"); onSent?.();
       if (successPath) router.push(successPath); else router.push("/app/sent?sent=true");
       router.refresh();
     } catch (cause) {
@@ -309,6 +314,7 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
       data.set("driveFileIds", JSON.stringify(await uploadPendingDriveFiles()));
       staged = await uploadComposeAttachments(files);
       data.set("uploadedAttachments", JSON.stringify(staged));
+      await attachPixelPerfectImage(data, previewFrameRef.current, renderMode);
       const response = await fetch("/api/mail/schedule", { method: "POST", body: data });
       const payload = await readApiJson<{ error?: string; id?: string }>(response);
       if (!response.ok || !payload.id) throw new Error(payload.error || "The email could not be scheduled.");
@@ -408,9 +414,18 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
         <EmailBodyEditor value={body} onChange={setBody} />
         <span className="font-normal text-[#93A0B5]">Pasted text becomes paragraphs with spacing. A blank line starts a new paragraph, and lines that start with - become a list.</span>
       </div>
+      <section aria-label="Email rendering mode" className="rounded-2xl border border-[#1C283C] bg-[#101828] p-4">
+        <p className="text-xs font-semibold uppercase tracking-[.16em] text-[#93A0B5]">Delivery format</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" aria-pressed={renderMode === "standard"} onClick={() => setRenderMode("standard")} className={`rounded-full border px-4 py-2 text-sm font-semibold ${renderMode === "standard" ? "border-[#22D3EE] bg-[#122033] text-[#67E8F9]" : "border-[#26384C] text-[#93A0B5]"}`}>Standard HTML</button>
+          <button type="button" aria-pressed={renderMode === "pixel-perfect"} onClick={() => setRenderMode("pixel-perfect")} className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold ${renderMode === "pixel-perfect" ? "border-[#22D3EE] bg-[#122033] text-[#67E8F9]" : "border-[#26384C] text-[#93A0B5]"}`}><Image className="size-4" /> Pixel Perfect</button>
+        </div>
+        <p className="mt-3 text-xs leading-5 text-[#93A0B5]">{renderMode === "pixel-perfect" ? "The full preview is sent as a high-resolution image. Recipients can open it at full size or read its accessible text version. Text inside the image cannot be selected or copied." : "Live text reflows to each screen and stays selectable. Some inboxes may adjust colors or spacing."}</p>
+        {renderMode === "pixel-perfect" && look === "parable-motion" && <p className="mt-2 text-xs leading-5 text-[#F6C66B]">This mode captures the current frame of the Parable Motion GIF. Choose Standard HTML to keep the logo animated.</p>}
+      </section>
       <section aria-label="Recipient preview" className="border p-3" style={{ background: previewChrome.masthead, borderColor: previewChrome.masthead }}>
         <p className="px-2 text-[10px] font-semibold uppercase tracking-[.28em]" style={{ color: previewChrome.accent }}>Recipient preview</p>
-        <iframe title="How the recipient will see this message" sandbox="" srcDoc={buildProfessionalEmailHtml({ from: from || "your verified sender", subject: subject || "Message preview", body: previewBody, look, logoImageSource: emailLogoAssetForLook(look)?.path })} className="mt-3 h-[520px] w-full border-0" style={{ background: previewChrome.page }} />
+        <iframe ref={previewFrameRef} title="How the recipient will see this message" sandbox="allow-same-origin" srcDoc={buildProfessionalEmailHtml({ from: from || "your verified sender", subject: subject || "Message preview", body: previewBody, look, logoImageSource: emailLogoAssetForLook(look)?.path })} className="mt-3 h-[520px] w-full border-0" style={{ background: previewChrome.page }} />
       </section>
       <div className="rounded-2xl border border-cyan-200/15 bg-[#080e1a]/70 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
