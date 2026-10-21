@@ -3,7 +3,8 @@ import { AppError } from "@/lib/errors";
 import { getGoogleMailEnv } from "@/lib/env";
 import { log } from "@/lib/logger";
 import { googleMailFailure } from "@/lib/mail/google-api-error";
-import { buildProfessionalEmailHtml } from "@/lib/mail/professional-html";
+import { loadInlineEmailLogo } from "@/lib/mail/inline-email-assets";
+import { buildProfessionalEmailHtml, defaultEmailLookForSender } from "@/lib/mail/professional-html";
 import { decryptToken, encryptToken } from "@/lib/mail/token-crypto";
 import type { MailProvider, OutgoingMail, ProviderSendResult } from "@/domain/providers/mail-provider";
 
@@ -198,7 +199,16 @@ export class GoogleMailProvider implements MailProvider {
       ...(message.replyToMessageId ? [`In-Reply-To: ${safeHeader(message.replyToMessageId)}`, `References: ${safeHeader(message.replyToMessageId)}`] : [])
     ];
     const attachments = message.attachments ?? [];
-    const htmlBody = message.htmlBody ?? buildProfessionalEmailHtml({ from: message.from, subject: message.subject, body: message.textBody });
+    const defaultLook = defaultEmailLookForSender(message.from);
+    const fallbackInlineImages = message.htmlBody ? [] : await loadInlineEmailLogo(defaultLook);
+    const inlineImages = [...(message.inlineImages ?? []), ...fallbackInlineImages];
+    const htmlBody = message.htmlBody ?? buildProfessionalEmailHtml({
+      from: message.from,
+      subject: message.subject,
+      body: message.textBody,
+      look: defaultLook,
+      logoImageSource: fallbackInlineImages[0] ? `cid:${fallbackInlineImages[0].contentId}` : undefined
+    });
     const alternativeBoundary = `kym_alt_${crypto.randomUUID()}`;
     const alternative = [
       `--${alternativeBoundary}`,
@@ -213,11 +223,38 @@ export class GoogleMailProvider implements MailProvider {
       base64Lines(htmlBody),
       `--${alternativeBoundary}--`
     ];
+    let messageBody: string[];
+    if (inlineImages.length) {
+      const relatedBoundary = `kym_related_${crypto.randomUUID()}`;
+      const related = [
+        `--${relatedBoundary}`,
+        `Content-Type: multipart/alternative; boundary="${alternativeBoundary}"`,
+        "",
+        ...alternative
+      ];
+      for (const image of inlineImages) {
+        const filename = safeHeader(image.filename).replaceAll('"', "") || "image";
+        const contentId = safeHeader(image.contentId).replace(/[<>]/g, "");
+        related.push(
+          `--${relatedBoundary}`,
+          `Content-Type: ${safeHeader(image.mimeType)}; name="${filename}"`,
+          "Content-Transfer-Encoding: base64",
+          `Content-ID: <${contentId}>`,
+          `Content-Disposition: inline; filename="${filename}"`,
+          "",
+          base64Lines(image.content)
+        );
+      }
+      related.push(`--${relatedBoundary}--`);
+      messageBody = [`Content-Type: multipart/related; type="multipart/alternative"; boundary="${relatedBoundary}"`, "", ...related];
+    } else {
+      messageBody = [`Content-Type: multipart/alternative; boundary="${alternativeBoundary}"`, "", ...alternative];
+    }
     let mime: string[];
     if (!attachments.length) {
-      mime = [...headers, `Content-Type: multipart/alternative; boundary="${alternativeBoundary}"`, "", ...alternative];
+      mime = [...headers, ...messageBody];
     } else {
-      const parts = [`--${boundary}`, `Content-Type: multipart/alternative; boundary="${alternativeBoundary}"`, "", ...alternative];
+      const parts = [`--${boundary}`, ...messageBody];
       for (const attachment of attachments) {
         const filename = safeHeader(attachment.filename).replaceAll('"', "") || "attachment";
         parts.push(`--${boundary}`, `Content-Type: ${safeHeader(attachment.mimeType)}; name=\"${filename}\"`, "Content-Transfer-Encoding: base64", `Content-Disposition: attachment; filename=\"${filename}\"`, "", base64Lines(attachment.content));

@@ -19,11 +19,22 @@ export const emailLooks = [
   { id: "personal", name: "Personal", company: null, description: "KYM Mail stationery" },
   { id: "snaptax", name: "SnapTax", company: "SnapTax", description: "SnapTax stationery" },
   { id: "securafin", name: "SecuraFin-AI", company: "SecuraFin-AI", description: "SecuraFin-AI stationery" },
-  { id: "parable", name: "PARABLE WORLD", company: "PARABLE WORLD", description: "PARABLE WORLD signal stationery" },
+  { id: "parable", name: "Standard design", company: "PARABLE WORLD", description: "PARABLE WORLD signal stationery" },
+  { id: "parable-motion", name: "Personalized motion - Dr. Valerie Carter-Daniels", company: "PARABLE WORLD", description: "Personalized animated stationery for Dr. Valerie Carter-Daniels" },
   { id: "mass", name: "MASS DEVELOPMENT GROUP", company: "MASS DEVELOPMENT GROUP", description: "MASS DEVELOPMENT GROUP stationery" }
 ] as const;
 
 export type EmailLook = (typeof emailLooks)[number]["id"];
+
+const emailLogoAssets: Partial<Record<EmailLook, { path: string; contentId: string; filename: string; mimeType: string }>> = {
+  personal: { path: "/brand/kym-mail-lockup.png", contentId: "kym-mail-lockup", filename: "kym-mail-lockup.png", mimeType: "image/png" },
+  parable: { path: "/brand/parable-world-neon-lockup.png", contentId: "parable-world-lockup", filename: "parable-world-neon-lockup.png", mimeType: "image/png" },
+  "parable-motion": { path: "/brand/parable-world-valerie-motion.gif", contentId: "parable-world-valerie-motion", filename: "parable-world-valerie-motion.gif", mimeType: "image/gif" }
+};
+
+export function emailLogoAssetForLook(look: EmailLook) {
+  return emailLogoAssets[look] ?? null;
+}
 
 export const ownerSignature = {
   name: "Kym Feltus",
@@ -132,8 +143,16 @@ const looks = {
   }
 } as const;
 
+const allLooks = {
+  ...looks,
+  "parable-motion": {
+    ...looks.parable,
+    mastheadImage: "/brand/parable-world-valerie-motion.gif"
+  }
+} as const;
+
 function signatureHtml(from: string, look: EmailLook) {
-  const theme = looks[look];
+  const theme = allLooks[look];
   const company = emailLooks.find((item) => item.id === look)?.company;
   const email = escapeHtml(from);
   return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:12px">
@@ -149,7 +168,7 @@ function signatureHtml(from: string, look: EmailLook) {
 }
 
 export function formatMessageHtml(body: string, look: EmailLook = "personal") {
-  const theme = looks[look];
+  const theme = allLooks[look];
   const blocks = body.replace(/\r\n/g, "\n").trim().split(/\n{2,}/);
   return blocks.map((block) => {
     const lines = block.split("\n").map((line) => line.trimEnd());
@@ -165,20 +184,26 @@ export function buildProfessionalEmailHtml({
   from,
   subject,
   body,
-  look
+  look,
+  logoImageSource
 }: {
   from: string;
   subject: string;
   body: string;
   look?: EmailLook;
+  /** Override the local preview URL with a CID when the image is attached to an email. */
+  logoImageSource?: string;
 }) {
   const selected = look ?? defaultEmailLookForSender(from);
-  const theme = looks[selected];
+  const theme = allLooks[selected];
   const content = formatMessageHtml(body, selected) || `<p style="margin:0;${theme.body}">${escapeHtml(body)}</p>`;
-  const logoPath = "mastheadImage" in theme ? theme.mastheadImage : "";
+  const logoPath = emailLogoAssetForLook(selected)?.path ?? ("mastheadImage" in theme ? theme.mastheadImage : "");
   const logoBase = process.env.APP_URL?.trim().replace(/\/$/, "") ?? "";
-  const logoAlt = selected === "parable" ? "PARABLE WORLD Virtual Ministry Operating System" : "KYM MAIL";
-  const logo = logoPath ? `<img src="${logoBase}${logoPath}" alt="${logoAlt}" width="${selected === "parable" ? "420" : "220"}" style="display:block;margin:0 auto 16px;height:auto;border:0" />` : "";
+  const logoAlt = selected === "parable-motion" ? "PARABLE WORLD Virtual Ministry Operating System for Dr. Valerie Carter-Daniels" : selected === "parable" ? "PARABLE WORLD Virtual Ministry Operating System" : "KYM MAIL";
+  const logoWidth = selected === "parable-motion" ? "520" : selected === "parable" ? "420" : "220";
+  const logoMargin = selected === "parable-motion" ? "0 auto" : "0 auto 16px";
+  const logo = logoPath ? `<img src="${logoImageSource ?? `${logoBase}${logoPath}`}" alt="${logoAlt}" width="${logoWidth}" style="display:block;margin:${logoMargin};height:auto;max-width:100%;border:0" />` : "";
+  const brandText = selected === "parable-motion" ? "" : `<p style="${theme.wordmarkStyle}">${theme.wordmark}</p>${"productHtml" in theme ? theme.productHtml : ""}<p style="${theme.kickerStyle}">${theme.kicker}</p>`;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -186,22 +211,20 @@ export function buildProfessionalEmailHtml({
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(subject)}</title>
 </head>
-<body bgcolor="${theme.page}" style="margin:0;padding:0;background:${theme.page}">
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="${theme.page}" style="background:${theme.page};padding:36px 12px">
+<body bgcolor="${theme.page}" style="margin:0;padding:0;background-color:${theme.page}">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="${theme.page}" style="background-color:${theme.page};padding:36px 12px;border-collapse:collapse">
   <tr>
     <td align="center" bgcolor="${theme.page}">
-      <table role="presentation" width="600" cellspacing="0" cellpadding="0" bgcolor="${theme.card}" style="max-width:600px;width:100%;background:${theme.card};border:1px solid ${theme.cardBorder}">
+      <table role="presentation" width="600" cellspacing="0" cellpadding="0" bgcolor="${theme.card}" style="max-width:600px;width:100%;background-color:${theme.card};border:1px solid ${theme.cardBorder};border-collapse:collapse">
         <tr>
-          <td bgcolor="${theme.masthead}" style="background:${theme.masthead};padding:28px 36px 22px;text-align:center">
+          <td bgcolor="${theme.masthead}" style="background-color:${theme.masthead};padding:28px 36px 22px;text-align:center">
             ${logo}
-            <p style="${theme.wordmarkStyle}">${theme.wordmark}</p>
-            ${"productHtml" in theme ? theme.productHtml : ""}
-            <p style="${theme.kickerStyle}">${theme.kicker}</p>
+            ${brandText}
           </td>
         </tr>
-        <tr><td bgcolor="${theme.rule}" style="height:1px;background:${theme.rule};font-size:0;line-height:0">&nbsp;</td></tr>
+        <tr><td bgcolor="${theme.rule}" style="height:1px;background-color:${theme.rule};font-size:0;line-height:0">&nbsp;</td></tr>
         <tr>
-          <td bgcolor="${theme.card}" style="padding:36px 36px 8px;background:${theme.card}">
+          <td bgcolor="${theme.card}" style="background-color:${theme.card};padding:36px 36px 8px">
             <p style="${theme.subjectStyle}">${escapeHtml(subject)}</p>
             ${content}
             ${signatureHtml(from, selected)}
@@ -216,6 +239,6 @@ export function buildProfessionalEmailHtml({
 }
 
 export function emailLookChrome(look: EmailLook) {
-  const theme = looks[look];
+  const theme = allLooks[look];
   return { page: theme.page, masthead: theme.masthead, accent: theme.rule };
 }

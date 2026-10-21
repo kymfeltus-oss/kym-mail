@@ -61,7 +61,7 @@ describe("professional outgoing email HTML", () => {
     expect(mass).toContain("Merge");
     expect(mass).toContain("Unify. Transform. Deliver.");
     expect(mass).not.toContain("Development correspondence");
-    expect(emailLooks.map((look) => look.id)).toEqual(["personal", "snaptax", "securafin", "parable", "mass"]);
+    expect(emailLooks.map((look) => look.id)).toEqual(["personal", "snaptax", "securafin", "parable", "parable-motion", "mass"]);
   });
 
   it("uses PARABLE WORLD neon stationery for an associated sender", () => {

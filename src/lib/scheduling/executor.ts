@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { AppError, toSafeError } from "@/lib/errors";
 import { log } from "@/lib/logger";
 import { loadGoogleProvider, syncGmailMessageById } from "@/lib/mail/gmail-sync";
+import { loadInlineEmailLogo } from "@/lib/mail/inline-email-assets";
 import { advanceOutreachAfterSend, guardOutreachSend } from "@/lib/mail/outreach";
 import { scheduledAttachmentBucket } from "@/lib/scheduling/constants";
 import { buildProfessionalEmailHtml, defaultEmailLookForSender, isEmailLook, type EmailLook } from "@/lib/mail/professional-html";
@@ -188,6 +189,8 @@ export async function executeDueScheduledMessages(database: SupabaseClient): Pro
       if (existing[0]) {
         result = { messageId: existing[0].messageId, threadId: existing[0].threadId };
       } else {
+        const look = isEmailLook(record.email_look) ? record.email_look : defaultEmailLookForSender(identity.email_address);
+        const inlineImages = await loadInlineEmailLogo(look);
         result = await provider.send({
           from: identity.email_address,
           to: record.to_addresses,
@@ -199,8 +202,10 @@ export async function executeDueScheduledMessages(database: SupabaseClient): Pro
             from: identity.email_address,
             subject: record.subject,
             body: record.text_body,
-            look: isEmailLook(record.email_look) ? record.email_look : defaultEmailLookForSender(identity.email_address)
+            look,
+            logoImageSource: inlineImages[0] ? `cid:${inlineImages[0].contentId}` : undefined
           }),
+          inlineImages,
           attachments: await storedAttachments(database, record),
           messageId: record.rfc_message_id,
           threadId: record.provider_thread_id ?? undefined,

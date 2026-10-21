@@ -9,7 +9,7 @@ import { readApiJson } from "@/lib/http/read-api-json";
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_COUNT, MAX_TOTAL_ATTACHMENT_BYTES, validateAttachmentEntries } from "@/lib/mail/attachment-validation";
 import { composeAttachmentBucket } from "@/lib/scheduling/constants";
 import { EmailBodyEditor } from "@/components/email-body-editor";
-import { buildProfessionalEmailHtml, defaultEmailLookForSender, emailLookChrome, emailLooks, isEmailLook, type EmailLook } from "@/lib/mail/professional-html";
+import { buildProfessionalEmailHtml, defaultEmailLookForSender, emailLogoAssetForLook, emailLookChrome, emailLooks, isEmailLook, type EmailLook } from "@/lib/mail/professional-html";
 import { appendDriveLinkSection } from "@/lib/mail/drive-link-attachments";
 import { blockedAttachmentPattern } from "@/lib/mail/compose-validation";
 
@@ -385,7 +385,11 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
       </label>
       <label className="grid min-w-0 gap-2 text-sm font-semibold text-[#F4F7FB]">Company
         <select name="emailLook" value={look} onChange={(event) => { if (isEmailLook(event.target.value)) setLook(event.target.value); }} className="w-full min-w-0 rounded-xl border border-[#1C283C] bg-[#101828] px-4 py-3 font-normal text-[#F4F7FB] outline-none focus:border-[#22D3EE]">
-          {emailLooks.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
+          {emailLooks.filter((option) => !option.id.startsWith("parable") && option.id !== "mass").map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
+          <optgroup label="PARABLE WORLD">
+            {emailLooks.filter((option) => option.id.startsWith("parable")).map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
+          </optgroup>
+          {emailLooks.filter((option) => option.id === "mass").map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
         </select>
         <span className="font-normal text-[#93A0B5]">The selected company stationery and your signature go to the recipient.</span>
       </label>
@@ -406,7 +410,7 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
       </div>
       <section aria-label="Recipient preview" className="border p-3" style={{ background: previewChrome.masthead, borderColor: previewChrome.masthead }}>
         <p className="px-2 text-[10px] font-semibold uppercase tracking-[.28em]" style={{ color: previewChrome.accent }}>Recipient preview</p>
-        <iframe title="How the recipient will see this message" sandbox="" srcDoc={buildProfessionalEmailHtml({ from: from || "your verified sender", subject: subject || "Message preview", body: previewBody, look })} className="mt-3 h-[520px] w-full border-0" style={{ background: previewChrome.page }} />
+        <iframe title="How the recipient will see this message" sandbox="" srcDoc={buildProfessionalEmailHtml({ from: from || "your verified sender", subject: subject || "Message preview", body: previewBody, look, logoImageSource: emailLogoAssetForLook(look)?.path })} className="mt-3 h-[520px] w-full border-0" style={{ background: previewChrome.page }} />
       </section>
       <div className="rounded-2xl border border-cyan-200/15 bg-[#080e1a]/70 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">

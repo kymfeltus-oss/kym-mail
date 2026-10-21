@@ -1,5 +1,6 @@
 export type MailAddress = { email: string; name?: string };
 export type MailAttachmentInput = { filename: string; mimeType: string; content: Uint8Array };
+export type MailInlineImageInput = { contentId: string; filename: string; mimeType: string; content: Uint8Array };
 export type OutgoingMail = {
   from: string;
   to: string[];
@@ -9,6 +10,7 @@ export type OutgoingMail = {
   textBody: string;
   htmlBody?: string;
   attachments?: MailAttachmentInput[];
+  inlineImages?: MailInlineImageInput[];
   messageId?: string;
   replyToMessageId?: string;
   threadId?: string;

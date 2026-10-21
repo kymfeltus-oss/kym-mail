@@ -4,6 +4,7 @@ import { toSafeError, ValidationError } from "@/lib/errors";
 import { log } from "@/lib/logger";
 import { MAX_ATTACHMENT_COUNT, validateAttachmentEntries, validateAttachmentFiles } from "@/lib/mail/attachment-validation";
 import { validateComposeInput } from "@/lib/mail/compose-validation";
+import { loadInlineEmailLogo } from "@/lib/mail/inline-email-assets";
 import { buildProfessionalEmailHtml, defaultEmailLookForSender, isEmailLook } from "@/lib/mail/professional-html";
 import { loadForwardedAttachments, parseForwardAttachmentIds } from "@/lib/mail/forwarded-attachments";
 import { loadGoogleProvider, syncGmailMessageById } from "@/lib/mail/gmail-sync";
@@ -94,6 +95,7 @@ export async function POST(request: NextRequest) {
     const body = appendDriveLinkSection(input.body, sharedDriveFiles);
     const rawLook = form.get("emailLook");
     const look = isEmailLook(rawLook) ? rawLook : defaultEmailLookForSender(input.from);
+    const inlineImages = await loadInlineEmailLogo(look);
     const result = await provider.send({
       from: input.from,
       to: input.to,
@@ -101,9 +103,10 @@ export async function POST(request: NextRequest) {
       bcc: input.bcc,
       subject: input.subject,
       textBody: body,
-      htmlBody: buildProfessionalEmailHtml({ from: input.from, subject: input.subject, body, look }),
+      htmlBody: buildProfessionalEmailHtml({ from: input.from, subject: input.subject, body, look, logoImageSource: inlineImages[0] ? `cid:${inlineImages[0].contentId}` : undefined }),
       threadId: input.providerThreadId,
       replyToMessageId: input.replyToMessageId,
+      inlineImages,
       attachments: [...forwardedAttachments, ...uploadedAttachments]
     });
 
