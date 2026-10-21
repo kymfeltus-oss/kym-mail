@@ -4,7 +4,7 @@ import { AppError } from "@/lib/errors";
 import { log } from "@/lib/logger";
 import { liveReplyAlert } from "@/lib/mail/follow-up";
 
-export async function sendLiveReplySms(_name: string, _company: string) {
+export async function sendLiveReplySms() {
   if (!hasTwilioEnv()) {
     log("warn", "mail.live_reply_sms_unconfigured", {});
     return false;

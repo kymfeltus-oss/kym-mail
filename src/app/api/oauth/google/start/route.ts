@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
 
   const env = getGoogleMailEnv(); const nonce = randomUUID();
   const state = signOAuthState({ ownerId: owner.user.id, mailConnectionId: connection.id, nonce, expiresAt: Date.now() + 10 * 60_000 });
-  const params = new URLSearchParams({ client_id: env.GOOGLE_CLIENT_ID, redirect_uri: env.GOOGLE_REDIRECT_URI, response_type: "code", access_type: "offline", prompt: "consent", include_granted_scopes: "true", scope: "https://www.googleapis.com/auth/gmail.modify", state });
+  const params = new URLSearchParams({ client_id: env.GOOGLE_CLIENT_ID, redirect_uri: env.GOOGLE_REDIRECT_URI, response_type: "code", access_type: "offline", prompt: "consent", include_granted_scopes: "true", scope: "https://www.googleapis.com/auth/gmail.modify https://www.googleapis.com/auth/drive.file", state });
   const response = NextResponse.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
   response.cookies.set("kym_google_oauth_nonce", nonce, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", maxAge: 600, path: "/api/oauth/google/callback" });
   await owner.database.from("mail_connections").update({ connection_state: "connecting", sync_error: null, updated_at: new Date().toISOString() }).eq("id", connection.id).eq("owner_id", owner.user.id);

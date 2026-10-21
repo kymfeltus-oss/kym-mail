@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getOwnerContext } from "@/lib/auth/owner-context";
 import { toSafeError, ValidationError } from "@/lib/errors";
 import { log } from "@/lib/logger";
-import { validateAttachmentEntries, validateAttachmentFiles } from "@/lib/mail/attachment-validation";
+import { MAX_ATTACHMENT_COUNT, validateAttachmentEntries, validateAttachmentFiles } from "@/lib/mail/attachment-validation";
 import { validateComposeInput } from "@/lib/mail/compose-validation";
 import { buildProfessionalEmailHtml, defaultEmailLookForSender, isEmailLook } from "@/lib/mail/professional-html";
 import { loadForwardedAttachments, parseForwardAttachmentIds } from "@/lib/mail/forwarded-attachments";
@@ -10,6 +10,7 @@ import { loadGoogleProvider, syncGmailMessageById } from "@/lib/mail/gmail-sync"
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { composeAttachmentBucket } from "@/lib/scheduling/constants";
 import { loadStagedAttachments, parseStagedAttachmentRefs } from "@/lib/mail/staged-attachments";
+import { appendDriveLinkSection, parseDriveFileIds, shareDriveFilesForEmail } from "@/lib/mail/drive-link-attachments";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -48,6 +49,8 @@ export async function POST(request: NextRequest) {
     }
     const forwardAttachmentIds = parseForwardAttachmentIds(form.getAll("forwardAttachmentIds"));
     if (!forwardAttachmentIds) throw new ValidationError("The forwarded attachment selection is invalid.");
+    const driveFileIds = parseDriveFileIds(form.get("driveFileIds"));
+    if (!driveFileIds) throw new ValidationError("The large-file selection is invalid.");
 
     const { data: identity, error: identityError } = await owner.database.from("mail_accounts")
       .select("id, mail_connection_id")
@@ -84,6 +87,11 @@ export async function POST(request: NextRequest) {
       forwardAttachmentIds,
       uploadedAttachments.map((attachment) => ({ name: attachment.filename, size: attachment.content.byteLength }))
     );
+    if (driveFileIds.length + forwardedAttachments.length + uploadedAttachments.length > MAX_ATTACHMENT_COUNT) {
+      throw new ValidationError(`Add no more than ${MAX_ATTACHMENT_COUNT} files to one email.`);
+    }
+    const sharedDriveFiles = await shareDriveFilesForEmail(provider, owner.user.id, identity.mail_connection_id, driveFileIds);
+    const body = appendDriveLinkSection(input.body, sharedDriveFiles);
     const rawLook = form.get("emailLook");
     const look = isEmailLook(rawLook) ? rawLook : defaultEmailLookForSender(input.from);
     const result = await provider.send({
@@ -92,8 +100,8 @@ export async function POST(request: NextRequest) {
       cc: input.cc,
       bcc: input.bcc,
       subject: input.subject,
-      textBody: input.body,
-      htmlBody: buildProfessionalEmailHtml({ from: input.from, subject: input.subject, body: input.body, look }),
+      textBody: body,
+      htmlBody: buildProfessionalEmailHtml({ from: input.from, subject: input.subject, body, look }),
       threadId: input.providerThreadId,
       replyToMessageId: input.replyToMessageId,
       attachments: [...forwardedAttachments, ...uploadedAttachments]
@@ -102,7 +110,7 @@ export async function POST(request: NextRequest) {
     let synchronized = true;
     try { await syncGmailMessageById(database, identity.mail_connection_id, result.messageId, projectId); }
     catch { synchronized = false; }
-    log("info", "mail.message_sent", { mailConnectionId: identity.mail_connection_id, synchronized, attachmentCount: uploadedAttachments.length + forwardedAttachments.length, projectAssociated: Boolean(projectId), forwardedAttachmentCount: forwardedAttachments.length });
+    log("info", "mail.message_sent", { mailConnectionId: identity.mail_connection_id, synchronized, attachmentCount: uploadedAttachments.length + forwardedAttachments.length, driveLinkCount: sharedDriveFiles.length, projectAssociated: Boolean(projectId), forwardedAttachmentCount: forwardedAttachments.length });
     return NextResponse.json({ sent: true, synchronized, messageId: result.messageId, threadId: result.threadId }, { status: synchronized ? 200 : 202 });
   } catch (error) {
     const safeError = toSafeError(error);

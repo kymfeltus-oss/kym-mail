@@ -3,12 +3,14 @@
 import { useRef, useState, type ChangeEvent } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
-import { CalendarClock, Paperclip, Send, X } from "lucide-react";
+import { CalendarClock, Paperclip, Send, X, CloudUpload, Check, LoaderCircle, FileVideo2 } from "lucide-react";
 import { readApiJson } from "@/lib/http/read-api-json";
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_COUNT, MAX_TOTAL_ATTACHMENT_BYTES, validateAttachmentEntries } from "@/lib/mail/attachment-validation";
 import { composeAttachmentBucket } from "@/lib/scheduling/constants";
 import { EmailBodyEditor } from "@/components/email-body-editor";
 import { buildProfessionalEmailHtml, defaultEmailLookForSender, emailLookChrome, emailLooks, isEmailLook, type EmailLook } from "@/lib/mail/professional-html";
+import { appendDriveLinkSection } from "@/lib/mail/drive-link-attachments";
+import { blockedAttachmentPattern } from "@/lib/mail/compose-validation";
 
 export type ComposeIdentity = { id: string; email_address: string; label: string; is_default: boolean };
 export type ComposeProject = { id: string; name: string; default_mail_account_id: string | null };
@@ -25,8 +27,110 @@ export type ComposeDraft = {
 
 type StagedAttachment = { path: string; filename: string; mimeType: string; size: number };
 type SignedAttachmentUpload = { path: string; token: string };
+type DriveAttachment = {
+  key: string;
+  file: File;
+  sessionUrl?: string;
+  driveFileId?: string;
+  uploadedBytes: number;
+  status: "ready" | "uploading" | "done" | "error";
+};
 
-const attachmentLimitMessage = "Add up to 25 safe file types, no larger than 20 MB each or 25 MB total.";
+const MAX_DRIVE_FILE_BYTES = 5 * 1024 ** 4;
+const DRIVE_CHUNK_BYTES = 32 * 1024 * 1024;
+
+function resumableOffset(xhr: XMLHttpRequest) {
+  const range = xhr.getResponseHeader("Range");
+  const match = range?.match(/^bytes=0-(\d+)$/);
+  return match ? Number(match[1]) + 1 : 0;
+}
+
+function sendDriveChunk(sessionUrl: string, file: File, start: number, end: number, onProgress: (uploaded: number) => void) {
+  return new Promise<{ status: number; nextByte: number; metadata: { id?: string } | null }>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", sessionUrl);
+    xhr.setRequestHeader("Content-Range", `bytes ${start}-${end - 1}/${file.size}`);
+    xhr.upload.onprogress = (event) => { if (event.lengthComputable) onProgress(start + event.loaded); };
+    xhr.onload = () => {
+      let metadata: { id?: string } | null = null;
+      if (xhr.status === 200 || xhr.status === 201) {
+        try { metadata = JSON.parse(xhr.responseText) as { id?: string }; }
+        catch { reject(new Error("Google Drive finished the upload without returning a file record.")); return; }
+      }
+      resolve({ status: xhr.status, nextByte: resumableOffset(xhr), metadata });
+    };
+    xhr.onerror = () => reject(new Error("The connection dropped during the Drive upload."));
+    xhr.ontimeout = () => reject(new Error("The Drive upload timed out. You can retry and resume it."));
+    xhr.timeout = 0;
+    xhr.send(file.slice(start, end));
+  });
+}
+
+function queryDriveUpload(sessionUrl: string, file: File) {
+  return new Promise<{ offset: number; fileId?: string }>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", sessionUrl);
+    xhr.setRequestHeader("Content-Range", `bytes */${file.size}`);
+    xhr.onload = () => {
+      if (xhr.status === 308) { resolve({ offset: resumableOffset(xhr) }); return; }
+      if (xhr.status === 200 || xhr.status === 201) {
+        try { resolve({ offset: file.size, fileId: (JSON.parse(xhr.responseText) as { id?: string }).id }); }
+        catch { reject(new Error("Google Drive could not confirm the completed upload.")); }
+        return;
+      }
+      reject(new Error("Google Drive could not resume this upload. Remove the file and select it again."));
+    };
+    xhr.onerror = () => reject(new Error("Could not check the Drive upload progress. Retry when your connection is available."));
+    xhr.send();
+  });
+}
+
+async function uploadFileToDrive(sessionUrl: string, file: File, initialOffset: number, onProgress: (uploaded: number) => void) {
+  let cursor = 0;
+  if (initialOffset > 0) {
+    const confirmed = await queryDriveUpload(sessionUrl, file);
+    if (confirmed.fileId) { onProgress(file.size); return confirmed.fileId; }
+    cursor = confirmed.offset;
+  }
+  let retries = 0;
+  while (cursor < file.size) {
+    const end = Math.min(cursor + DRIVE_CHUNK_BYTES, file.size);
+    try {
+      const result = await sendDriveChunk(sessionUrl, file, cursor, end, onProgress);
+      if (result.status === 200 || result.status === 201) {
+        if (!result.metadata?.id) throw new Error("Google Drive did not return the uploaded file ID.");
+        onProgress(file.size);
+        return result.metadata.id;
+      }
+      if (result.status === 308) {
+        if (result.nextByte < cursor) throw new Error("Google Drive returned an invalid upload position.");
+        if (result.nextByte === cursor) {
+          if (retries >= 3) throw new Error("Google Drive did not confirm upload progress. Retry the file upload.");
+          retries += 1;
+          await new Promise((resolve) => window.setTimeout(resolve, 800 * retries));
+          continue;
+        }
+        cursor = Math.min(result.nextByte, file.size);
+        onProgress(cursor);
+        retries = 0;
+        continue;
+      }
+      if (result.status < 500 && result.status !== 429) throw new Error(`Google Drive rejected the upload (HTTP ${result.status}).`);
+      throw new Error("Google Drive had a temporary upload error.");
+    } catch (error) {
+      if (retries >= 3) throw error;
+      await new Promise((resolve) => window.setTimeout(resolve, 800 * (retries + 1)));
+      const confirmed = await queryDriveUpload(sessionUrl, file);
+      if (confirmed.fileId) { onProgress(file.size); return confirmed.fileId; }
+      cursor = confirmed.offset;
+      onProgress(cursor);
+      retries += 1;
+    }
+  }
+  throw new Error("Google Drive ended the upload without returning the file ID.");
+}
+
+const attachmentLimitMessage = "Add up to 25 safe file types. Inline email attachments can be up to 20 MB each and 25 MB total; larger files use Google Drive links.";
 
 async function cleanupStagedUploads(paths: string[]) {
   if (!paths.length) return;
@@ -93,6 +197,7 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
   const [from, setFrom] = useState(draftIdentity?.email_address ?? (initialProject ? initialProjectIdentity?.email_address ?? "" : globalDefault?.email_address ?? ""));
   const [advanced, setAdvanced] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
+  const [driveFiles, setDriveFiles] = useState<DriveAttachment[]>([]);
   const [forwardedAttachments, setForwardedAttachments] = useState(draft?.forwardedAttachments ?? []);
   const [status, setStatus] = useState<"idle" | "sending" | "scheduling" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -105,6 +210,39 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
   const selectedProject = projects.find((project) => project.id === projectId);
   const previewChrome = emailLookChrome(look);
   const defaultIdentityUnavailable = Boolean(selectedProject && !identities.some((identity) => identity.id === selectedProject.default_mail_account_id));
+
+  function updateDriveFile(key: string, updates: Partial<DriveAttachment>) {
+    setDriveFiles((current) => current.map((item) => item.key === key ? { ...item, ...updates } : item));
+  }
+
+  async function uploadPendingDriveFiles() {
+    const uploadedIds: string[] = [];
+    for (const item of driveFiles) {
+      if (item.driveFileId) { uploadedIds.push(item.driveFileId); continue; }
+      let sessionUrl = item.sessionUrl;
+      try {
+        updateDriveFile(item.key, { status: "uploading" });
+        if (!sessionUrl) {
+          const response = await fetch("/api/mail/drive-uploads", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ from, name: item.file.name, mimeType: item.file.type || "application/octet-stream", size: item.file.size })
+          });
+          const payload = await readApiJson<{ error?: string; sessionUrl?: string }>(response);
+          if (!response.ok || !payload.sessionUrl) throw new Error(payload.error || "Google Drive could not prepare the upload.");
+          sessionUrl = payload.sessionUrl;
+          updateDriveFile(item.key, { sessionUrl, uploadedBytes: 0 });
+        }
+        const driveFileId = await uploadFileToDrive(sessionUrl, item.file, item.uploadedBytes, (uploadedBytes) => updateDriveFile(item.key, { uploadedBytes }));
+        updateDriveFile(item.key, { driveFileId, uploadedBytes: item.file.size, status: "done" });
+        uploadedIds.push(driveFileId);
+      } catch (cause) {
+        updateDriveFile(item.key, { status: "error" });
+        throw cause;
+      }
+    }
+    return uploadedIds;
+  }
 
   function applyFrom(nextFrom: string) {
     setFrom(nextFrom);
@@ -127,16 +265,18 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
     ])) {
       setStatus("error"); setError(attachmentLimitMessage); return;
     }
+    if (attachmentCount > MAX_ATTACHMENT_COUNT) { setStatus("error"); setError(attachmentLimitMessage); return; }
     const data = new FormData(event.currentTarget);
     data.delete("attachments");
     let staged: StagedAttachment[] = [];
     try {
+      data.set("driveFileIds", JSON.stringify(await uploadPendingDriveFiles()));
       staged = await uploadComposeAttachments(files);
       data.set("uploadedAttachments", JSON.stringify(staged));
       const response = await fetch("/api/mail/send", { method: "POST", body: data });
       const payload = await readApiJson<{ error?: string; sent?: boolean }>(response);
       if (!response.ok && !payload.sent) throw new Error(payload.error || "The message could not be sent.");
-      formRef.current?.reset(); setFiles([]); setForwardedAttachments([]); setBody(""); setSubject(""); onSent?.();
+      formRef.current?.reset(); setFiles([]); setDriveFiles([]); setForwardedAttachments([]); setBody(""); setSubject(""); onSent?.();
       if (successPath) router.push(successPath); else router.push("/app/sent?sent=true");
       router.refresh();
     } catch (cause) {
@@ -158,12 +298,14 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
     ])) {
       setStatus("error"); setError(attachmentLimitMessage); return;
     }
+    if (attachmentCount > MAX_ATTACHMENT_COUNT) { setStatus("error"); setError(attachmentLimitMessage); return; }
     setStatus("scheduling"); setError(null);
     const data = new FormData(form);
     data.delete("attachments");
     data.set("scheduledFor", instant.toISOString()); data.set("timezone", timezone);
     let staged: StagedAttachment[] = [];
     try {
+      data.set("driveFileIds", JSON.stringify(await uploadPendingDriveFiles()));
       staged = await uploadComposeAttachments(files);
       data.set("uploadedAttachments", JSON.stringify(staged));
       const response = await fetch("/api/mail/schedule", { method: "POST", body: data });
@@ -180,25 +322,43 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
     const input = event.currentTarget;
     const incoming = Array.from(input.files ?? []);
     const nextFiles = [...files];
+    const nextDriveFiles = [...driveFiles];
+    const duplicate = (file: File) => nextFiles.some((current) => current.name === file.name && current.size === file.size && current.lastModified === file.lastModified)
+      || nextDriveFiles.some((current) => current.file.name === file.name && current.file.size === file.size && current.file.lastModified === file.lastModified);
+    let inlineBytes = forwardedAttachments.reduce((sum, attachment) => sum + attachment.sizeBytes, 0) + nextFiles.reduce((sum, file) => sum + file.size, 0);
+    let selectionError = "";
     for (const file of incoming) {
-      const alreadySelected = nextFiles.some((current) => current.name === file.name && current.size === file.size && current.lastModified === file.lastModified);
-      if (!alreadySelected) nextFiles.push(file);
+      if (duplicate(file)) continue;
+      if (file.size <= 0 || file.size > MAX_DRIVE_FILE_BYTES || blockedAttachmentPattern.test(file.name)) {
+        selectionError = "Choose a non-empty, supported file up to 5 TB.";
+        continue;
+      }
+      if (forwardedAttachments.length + nextFiles.length + nextDriveFiles.length >= MAX_ATTACHMENT_COUNT) {
+        selectionError = attachmentLimitMessage;
+        break;
+      }
+      if (file.size <= MAX_ATTACHMENT_BYTES && inlineBytes + file.size <= MAX_TOTAL_ATTACHMENT_BYTES) {
+        nextFiles.push(file);
+        inlineBytes += file.size;
+      } else {
+        nextDriveFiles.push({ key: crypto.randomUUID(), file, uploadedBytes: 0, status: "ready" });
+      }
     }
     const entries = [
       ...forwardedAttachments.map((attachment) => ({ name: attachment.filename, size: attachment.sizeBytes })),
       ...nextFiles.map((file) => ({ name: file.name, size: file.size }))
     ];
-    if (!validateAttachmentEntries(entries)) {
-      setStatus("error"); setError(attachmentLimitMessage); input.value = ""; return;
-    }
-    setFiles(nextFiles); setStatus("idle"); setError(null); input.value = "";
+    if (!validateAttachmentEntries(entries)) selectionError = attachmentLimitMessage;
+    setFiles(nextFiles); setDriveFiles(nextDriveFiles); setStatus(selectionError ? "error" : "idle"); setError(selectionError || null); input.value = "";
   }
 
   const schedulePreview = scheduledLocal && Number.isFinite(new Date(scheduledLocal).getTime())
     ? new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(new Date(scheduledLocal))
     : "Choose a future time";
-  const attachmentCount = forwardedAttachments.length + files.length;
+  const attachmentCount = forwardedAttachments.length + files.length + driveFiles.length;
   const attachmentBytes = forwardedAttachments.reduce((sum, attachment) => sum + attachment.sizeBytes, 0) + files.reduce((sum, file) => sum + file.size, 0);
+  const previewBody = appendDriveLinkSection(body || "Your message will appear here.", driveFiles.filter((item) => item.driveFileId).map((item) => ({ id: item.driveFileId!, name: item.file.name, url: `https://drive.google.com/file/d/${encodeURIComponent(item.driveFileId!)}/view` })));
+  const senderLockedByDriveUpload = driveFiles.some((item) => item.sessionUrl || item.driveFileId);
 
   return <form ref={formRef} onSubmit={submit} className="glass min-w-0 rounded-3xl p-5 sm:p-8">
     {draft?.providerThreadId && <input type="hidden" name="providerThreadId" value={draft.providerThreadId} />}
@@ -214,10 +374,11 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
       </label>
       {defaultIdentityUnavailable && <div role="alert" className="rounded-2xl border border-[#1D4E89] bg-[#122033] px-4 py-3"><p className="text-sm font-semibold text-[#67E8F9]">Project default sender is unavailable</p><p className="mt-1 text-xs leading-5 text-[#93A0B5]">Choose a verified From identity explicitly. KYM Mail will not switch senders silently.</p></div>}
       <label className="grid min-w-0 gap-2 text-sm font-semibold text-[#F4F7FB]">From
-        <select name="from" value={from} onChange={(event) => applyFrom(event.target.value)} required className="w-full min-w-0 rounded-xl border border-[#1C283C] bg-[#101828] px-4 py-3 font-normal text-[#F4F7FB] outline-none focus:border-[#22D3EE]">
+        <select name="from" value={from} onChange={(event) => applyFrom(event.target.value)} required disabled={status === "sending" || status === "scheduling" || senderLockedByDriveUpload} className="w-full min-w-0 rounded-xl border border-[#1C283C] bg-[#101828] px-4 py-3 font-normal text-[#F4F7FB] outline-none focus:border-[#22D3EE] disabled:opacity-70">
           <option value="">Select a verified sender</option>
           {identities.map((identity) => <option key={identity.id} value={identity.email_address}>{identity.email_address} — {identity.label}</option>)}
         </select>
+        {senderLockedByDriveUpload && <span className="font-normal text-[#93A0B5]">Remove Drive files to switch senders; the upload is stored in the selected sender’s Google Drive.</span>}
       </label>
       <label className="grid min-w-0 gap-2 text-sm font-semibold text-[#F4F7FB]">Company
         <select name="emailLook" value={look} onChange={(event) => { if (isEmailLook(event.target.value)) setLook(event.target.value); }} className="w-full min-w-0 rounded-xl border border-[#1C283C] bg-[#101828] px-4 py-3 font-normal text-[#F4F7FB] outline-none focus:border-[#22D3EE]">
@@ -242,20 +403,31 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
       </div>
       <section aria-label="Recipient preview" className="border p-3" style={{ background: previewChrome.masthead, borderColor: previewChrome.masthead }}>
         <p className="px-2 text-[10px] font-semibold uppercase tracking-[.28em]" style={{ color: previewChrome.accent }}>Recipient preview</p>
-        <iframe title="How the recipient will see this message" sandbox="" srcDoc={buildProfessionalEmailHtml({ from: from || "your verified sender", subject: subject || "Message preview", body: body || "Your message will appear here.", look })} className="mt-3 h-[520px] w-full border-0" style={{ background: previewChrome.page }} />
+        <iframe title="How the recipient will see this message" sandbox="" srcDoc={buildProfessionalEmailHtml({ from: from || "your verified sender", subject: subject || "Message preview", body: previewBody, look })} className="mt-3 h-[520px] w-full border-0" style={{ background: previewChrome.page }} />
       </section>
       <div className="rounded-2xl border border-cyan-200/15 bg-[#080e1a]/70 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-[#F4F7FB]">Attachments</p>
-            <p className="mt-1 text-xs leading-5 text-[#93A0B5]">Up to {MAX_ATTACHMENT_COUNT} files · {MAX_ATTACHMENT_BYTES / (1024 * 1024)} MB each · {MAX_TOTAL_ATTACHMENT_BYTES / (1024 * 1024)} MB total</p>
-            {attachmentCount > 0 && <p role="status" aria-live="polite" className="mt-2 text-xs font-semibold text-cyan-100">{attachmentCount} selected · {(attachmentBytes / (1024 * 1024)).toFixed(1)} of {MAX_TOTAL_ATTACHMENT_BYTES / (1024 * 1024)} MB</p>}
+            <p className="mt-1 text-xs leading-5 text-[#93A0B5]">Up to {MAX_ATTACHMENT_COUNT} files. Inline email attachments: {MAX_ATTACHMENT_BYTES / (1024 * 1024)} MB each · {MAX_TOTAL_ATTACHMENT_BYTES / (1024 * 1024)} MB total.</p>
+            <p className="mt-1 flex items-center gap-1.5 text-xs leading-5 text-cyan-100"><CloudUpload className="size-3.5 shrink-0" /> Larger files upload to Drive in resumable chunks and become viewable to anyone with the link when sent.</p>
+            {attachmentCount > 0 && <p role="status" aria-live="polite" className="mt-2 text-xs font-semibold text-cyan-100">{attachmentCount} selected · {(attachmentBytes / (1024 * 1024)).toFixed(1)} MB inline</p>}
           </div>
           <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-cyan-200/20 bg-cyan-200/[.05] px-4 py-2.5 text-xs font-semibold text-cyan-50 transition hover:bg-cyan-200/10"><Paperclip className="size-4 text-[#22D3EE]" /> {attachmentCount ? "Add more files" : "Attach files"}<input name="attachments" type="file" multiple disabled={status === "sending" || status === "scheduling"} className="sr-only" onChange={addSelectedFiles} /></label>
         </div>
-        {(forwardedAttachments.length > 0 || files.length > 0) && <ul className="mt-3 space-y-2">
+        {(forwardedAttachments.length > 0 || files.length > 0 || driveFiles.length > 0) && <ul className="mt-3 space-y-2">
           {forwardedAttachments.map((attachment) => <li key={attachment.id} className="flex items-center justify-between rounded-xl bg-[#122033] px-3 py-2 text-xs text-[#93A0B5]"><span className="truncate">{attachment.filename} · {(attachment.sizeBytes / (1024 * 1024)).toFixed(1)} MB · from original message</span><button type="button" disabled={status === "sending" || status === "scheduling"} aria-label={`Remove ${attachment.filename}`} onClick={() => { setForwardedAttachments((current) => current.filter((item) => item.id !== attachment.id)); setStatus("idle"); setError(null); }}><X className="size-4" /></button></li>)}
           {files.map((file, index) => <li key={`${file.name}-${file.size}-${index}`} className="flex items-center justify-between rounded-xl bg-[#122033] px-3 py-2 text-xs text-[#93A0B5]"><span className="truncate">{file.name} · {(file.size / (1024 * 1024)).toFixed(1)} MB</span><button type="button" disabled={status === "sending" || status === "scheduling"} aria-label={`Remove ${file.name}`} onClick={() => { setFiles((current) => current.filter((_, fileIndex) => fileIndex !== index)); setStatus("idle"); setError(null); }}><X className="size-4" /></button></li>)}
+          {driveFiles.map((item) => {
+            const progress = Math.min(100, Math.round(item.uploadedBytes / item.file.size * 100));
+            return <li key={item.key} className="rounded-xl border border-cyan-300/15 bg-[#0b1525] px-3 py-2.5 text-xs text-[#93A0B5]">
+              <div className="flex min-w-0 items-center justify-between gap-3"><span className="flex min-w-0 items-center gap-2"><FileVideo2 className="size-4 shrink-0 text-[#22D3EE]" /><span className="truncate">{item.file.name} · {(item.file.size / (1024 * 1024)).toFixed(item.file.size >= 1024 * 1024 * 1024 ? 2 : 1)} MB · Drive link</span></span>
+                {item.status === "done" ? <span className="inline-flex shrink-0 items-center gap-1 text-emerald-300"><Check className="size-3.5" /> Link ready</span> : item.status === "uploading" ? <span className="inline-flex shrink-0 items-center gap-1 text-cyan-100"><LoaderCircle className="size-3.5 animate-spin" /> {progress}%</span> : item.status === "error" ? <span className="shrink-0 text-amber-300">Retry on send</span> : <span className="shrink-0 text-[#93A0B5]">Ready</span>}
+                <button type="button" disabled={status === "sending" || status === "scheduling"} aria-label={`Remove ${item.file.name}`} onClick={() => { setDriveFiles((current) => current.filter((driveFile) => driveFile.key !== item.key)); setStatus("idle"); setError(null); }}><X className="size-4" /></button>
+              </div>
+              {item.status === "uploading" && <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-fuchsia-400 transition-[width]" style={{ width: `${progress}%` }} /></div>}
+            </li>;
+          })}
         </ul>}
       </div>
     </div>

@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendLiveReplySms } from "@/lib/alerts/twilio-sms";
 import { log } from "@/lib/logger";
-import { classifyInbound, fillFollowUp, nameFromEmail, secondFollowUpAt } from "@/lib/mail/follow-up";
+import { classifyInbound, fillFollowUp, secondFollowUpAt } from "@/lib/mail/follow-up";
 import { replySubject } from "@/lib/mail/reply-forward";
 import { scheduledRfcMessageId } from "@/lib/scheduling/constants";
 
@@ -24,7 +24,7 @@ type SequenceRow = {
 export async function stopOutreachForInbound(database: SupabaseClient, input: { threadId: string; from: string; subject: string; text: string }) {
   const kind = classifyInbound(input);
   if (kind === "ooo") return;
-  const { data: sequence } = await database.from("outreach_sequences").select("id, recipient_name, company_name").eq("mail_thread_id", input.threadId).eq("status", "active").maybeSingle();
+  const { data: sequence } = await database.from("outreach_sequences").select("id").eq("mail_thread_id", input.threadId).eq("status", "active").maybeSingle();
   if (!sequence) return;
   const now = new Date().toISOString();
   const leadStatus = kind === "bounce" ? "bounced" : kind === "dnc" ? "do_not_contact" : "replied";
@@ -43,7 +43,7 @@ export async function stopOutreachForInbound(database: SupabaseClient, input: { 
   }).eq("outreach_sequence_id", sequence.id).eq("status", "SCHEDULED");
   if (leadStatus !== "replied") return;
   try {
-    const sent = await sendLiveReplySms(sequence.recipient_name || nameFromEmail(input.from), sequence.company_name);
+    const sent = await sendLiveReplySms();
     if (sent) await database.from("outreach_sequences").update({ alerted_at: now }).eq("id", sequence.id).is("alerted_at", null);
   } catch (error) {
     log("error", "mail.live_reply_sms_failed", { sequenceId: sequence.id });

@@ -8,7 +8,18 @@ import { decryptToken, encryptToken } from "@/lib/mail/token-crypto";
 import type { MailProvider, OutgoingMail, ProviderSendResult } from "@/domain/providers/mail-provider";
 
 type ConnectionTokens = { id: string; encrypted_access_token: string | null; encrypted_refresh_token: string | null; token_expires_at: string | null };
-type GoogleError = { error?: { code?: number; status?: string } };
+type GoogleError = { error?: { code?: number; status?: string; errors?: Array<{ reason?: string }> } };
+
+export type GoogleDriveFile = {
+  id: string;
+  name: string;
+  mimeType: string;
+  size?: string;
+  webViewLink?: string;
+  appProperties?: Record<string, string>;
+};
+
+export type DriveUploadSession = { sessionUrl: string };
 
 function safeHeader(value: string) { return value.replace(/[\r\n]+/g, " ").trim(); }
 function base64Lines(value: Uint8Array | string) {
@@ -53,6 +64,71 @@ export class GoogleMailProvider implements MailProvider {
       throw new AppError("PROVIDER_UNAVAILABLE", failure.safeMessage, { status: failure.status, providerStatus: failure.providerStatus, path: requestPath });
     }
     return response.json() as Promise<T>;
+  }
+
+  private async driveRequest<T>(path: string, init?: RequestInit): Promise<T> {
+    const response = await fetch(`https://www.googleapis.com/drive/v3${path}`, { ...init, headers: { authorization: `Bearer ${await this.accessToken()}`, "content-type": "application/json", ...init?.headers } });
+    if (response.status === 401) return this.requireReauthorization();
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({})) as GoogleError;
+      const insufficientScope = response.status === 403 && body.error?.errors?.some((item) => item.reason === "insufficientPermissions");
+      if (insufficientScope) throw new AppError("UNAUTHORIZED", "Reconnect Google Mail and approve Google Drive access to upload large files.");
+      const failure = googleMailFailure(response.status, body.error?.status);
+      log("error", "mail.google_drive_api_failed", { status: failure.status, providerStatus: failure.providerStatus, path: path.split("?")[0] });
+      throw new AppError("PROVIDER_UNAVAILABLE", response.status === 403 ? "Google Drive could not share this file. Check your account's sharing settings." : failure.safeMessage, { status: failure.status, providerStatus: failure.providerStatus });
+    }
+    return response.json() as Promise<T>;
+  }
+
+  async startDriveUpload({ name, mimeType, size, ownerId }: { name: string; mimeType: string; size: number; ownerId: string }): Promise<DriveUploadSession> {
+    const response = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,name,mimeType,size,webViewLink,appProperties", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${await this.accessToken()}`,
+        "content-type": "application/json; charset=UTF-8",
+        "x-upload-content-type": mimeType,
+        "x-upload-content-length": String(size)
+      },
+      body: JSON.stringify({
+        name,
+        mimeType,
+        appProperties: { kymMailOwner: ownerId, kymMailConnection: this.connection.id, kymMailPurpose: "email-link-attachment" }
+      })
+    });
+    if (response.status === 401) return this.requireReauthorization();
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({})) as GoogleError;
+      const insufficientScope = response.status === 403 && body.error?.errors?.some((item) => item.reason === "insufficientPermissions");
+      if (insufficientScope) throw new AppError("UNAUTHORIZED", "Reconnect Google Mail and approve Google Drive access to upload large files.");
+      const failure = googleMailFailure(response.status, body.error?.status);
+      log("error", "mail.google_drive_upload_start_failed", { status: failure.status, providerStatus: failure.providerStatus });
+      throw new AppError("PROVIDER_UNAVAILABLE", failure.safeMessage, { status: failure.status, providerStatus: failure.providerStatus });
+    }
+    const sessionUrl = response.headers.get("location");
+    if (!sessionUrl) throw new AppError("PROVIDER_UNAVAILABLE", "Google Drive could not start the large-file upload.");
+    const parsedUrl = new URL(sessionUrl);
+    if (parsedUrl.protocol !== "https:" || parsedUrl.hostname !== "www.googleapis.com" || !parsedUrl.pathname.startsWith("/upload/drive/v3/files")) {
+      throw new AppError("PROVIDER_UNAVAILABLE", "Google Drive returned an invalid upload session.");
+    }
+    return { sessionUrl };
+  }
+
+  getDriveFile(fileId: string) {
+    const params = new URLSearchParams({ fields: "id,name,mimeType,size,webViewLink,appProperties" });
+    return this.driveRequest<GoogleDriveFile>(`/files/${encodeURIComponent(fileId)}?${params}`);
+  }
+
+  async shareDriveFileWithAnyone(fileId: string) {
+    const params = new URLSearchParams({ fields: "permissions(id,type,role,allowFileDiscovery)" });
+    const current = await this.driveRequest<{ permissions?: Array<{ id: string; type: string; role: string; allowFileDiscovery?: boolean }> }>(`/files/${encodeURIComponent(fileId)}/permissions?${params}`);
+    const existing = current.permissions?.find((permission) => permission.type === "anyone");
+    if (existing?.role === "reader" && existing.allowFileDiscovery === false) return;
+    if (existing) {
+      await this.driveRequest(`/files/${encodeURIComponent(fileId)}/permissions/${encodeURIComponent(existing.id)}?fields=id`, { method: "PATCH", body: JSON.stringify({ role: "reader", allowFileDiscovery: false }) });
+      return;
+    }
+    const createParams = new URLSearchParams({ sendNotificationEmail: "false", fields: "id,type,role" });
+    await this.driveRequest(`/files/${encodeURIComponent(fileId)}/permissions?${createParams}`, { method: "POST", body: JSON.stringify({ type: "anyone", role: "reader", allowFileDiscovery: false }) });
   }
 
   healthCheck() { return this.request("/profile").then(() => ({ available: true })).catch(() => ({ available: false })); }

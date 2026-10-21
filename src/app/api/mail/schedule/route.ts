@@ -4,7 +4,7 @@ import { getOwnerContext } from "@/lib/auth/owner-context";
 import { toSafeError, ValidationError } from "@/lib/errors";
 import { log } from "@/lib/logger";
 import { attachmentSha256 } from "@/lib/mail/attachment-hash";
-import { validateAttachmentEntries, validateAttachmentFiles } from "@/lib/mail/attachment-validation";
+import { MAX_ATTACHMENT_COUNT, validateAttachmentEntries, validateAttachmentFiles } from "@/lib/mail/attachment-validation";
 import { validateComposeInput } from "@/lib/mail/compose-validation";
 import { loadForwardedAttachments, parseForwardAttachmentIds } from "@/lib/mail/forwarded-attachments";
 import { requireScheduledIdentity, resolveScheduledProject } from "@/lib/scheduling/access";
@@ -13,6 +13,8 @@ import { validateScheduleTiming } from "@/lib/scheduling/validation";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { loadStagedAttachments, parseStagedAttachmentRefs } from "@/lib/mail/staged-attachments";
 import { defaultEmailLookForSender, isEmailLook } from "@/lib/mail/professional-html";
+import { appendDriveLinkSection, parseDriveFileIds, shareDriveFilesForEmail } from "@/lib/mail/drive-link-attachments";
+import { loadGoogleProvider } from "@/lib/mail/gmail-sync";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -56,6 +58,8 @@ export async function POST(request: NextRequest) {
     if (!validateAttachmentFiles(files)) throw new ValidationError("One or more attachments are unsupported or too large.");
     const forwardAttachmentIds = parseForwardAttachmentIds(form.getAll("forwardAttachmentIds"));
     if (!forwardAttachmentIds) throw new ValidationError("The forwarded attachment selection is invalid.");
+    const driveFileIds = parseDriveFileIds(form.get("driveFileIds"));
+    if (!driveFileIds) throw new ValidationError("The large-file selection is invalid.");
 
     const identity = await requireScheduledIdentity(owner.database, owner.user.id, input.from);
     const projectId = await resolveScheduledProject(owner.database, owner.user.id, requestedProjectId, input.providerThreadId);
@@ -73,6 +77,12 @@ export async function POST(request: NextRequest) {
       forwardAttachmentIds,
       uploadedAttachments.map((attachment) => ({ name: attachment.filename, size: attachment.content.byteLength }))
     );
+    if (driveFileIds.length + forwardedAttachments.length + uploadedAttachments.length > MAX_ATTACHMENT_COUNT) {
+      throw new ValidationError(`Add no more than ${MAX_ATTACHMENT_COUNT} files to one email.`);
+    }
+    const { provider } = await loadGoogleProvider(database, identity.mail_connection_id);
+    const sharedDriveFiles = await shareDriveFilesForEmail(provider, owner.user.id, identity.mail_connection_id, driveFileIds);
+    const body = appendDriveLinkSection(input.body, sharedDriveFiles);
     scheduledId = crypto.randomUUID();
     const attachments = [] as Array<{ id: string; owner_id: string; scheduled_message_id: string; object_path: string; filename: string; mime_type: string; size_bytes: number; sha256: string }>;
     for (const file of [...forwardedAttachments, ...uploadedAttachments]) {
@@ -97,7 +107,7 @@ export async function POST(request: NextRequest) {
       cc_addresses: input.cc,
       bcc_addresses: input.bcc,
       subject: input.subject,
-      text_body: input.body,
+      text_body: body,
       email_look: emailLook,
       scheduled_for: timing.scheduledFor,
       next_attempt_at: timing.scheduledFor,
@@ -108,7 +118,7 @@ export async function POST(request: NextRequest) {
       const { error: attachmentError } = await database.from("scheduled_message_attachments").insert(attachments);
       if (attachmentError) throw new Error("SCHEDULE_ATTACHMENT_PERSISTENCE_FAILED");
     }
-    log("info", "mail.schedule_created", { scheduledMessageId: scheduledId, attachmentCount: attachments.length, projectAssociated: Boolean(projectId) });
+    log("info", "mail.schedule_created", { scheduledMessageId: scheduledId, attachmentCount: attachments.length, driveLinkCount: sharedDriveFiles.length, projectAssociated: Boolean(projectId) });
     return NextResponse.json({ scheduled: true, id: scheduledId }, { status: 201 });
   } catch (error) {
     if (scheduledId) await database.from("scheduled_messages").delete().eq("id", scheduledId);
@@ -116,7 +126,8 @@ export async function POST(request: NextRequest) {
     const safeError = toSafeError(error);
     const validationFailure = error instanceof z.ZodError || safeError.code === "VALIDATION";
     log("error", "mail.schedule_create_failed", { code: safeError.code });
-    return NextResponse.json({ error: validationFailure ? safeError.safeMessage : "The email could not be scheduled." }, { status: validationFailure ? 400 : 503 });
+    const message = validationFailure || safeError.code === "UNAUTHORIZED" ? safeError.safeMessage : "The email could not be scheduled.";
+    return NextResponse.json({ error: message }, { status: validationFailure ? 400 : safeError.code === "UNAUTHORIZED" ? 401 : 503 });
   } finally {
     if (stagedPaths.length) {
       const { error } = await database.storage.from(composeAttachmentBucket).remove(stagedPaths);
