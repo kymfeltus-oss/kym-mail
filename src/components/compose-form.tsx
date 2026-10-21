@@ -2,8 +2,9 @@
 
 import { useRef, useState, type ChangeEvent } from "react";
 import { createClient } from "@supabase/supabase-js";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CalendarClock, Paperclip, Send, X, CloudUpload, Check, LoaderCircle, FileVideo2 } from "lucide-react";
+import { CalendarClock, Paperclip, Send, X, CloudUpload, Check, LoaderCircle, FileVideo2, RefreshCw } from "lucide-react";
 import { readApiJson } from "@/lib/http/read-api-json";
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENT_COUNT, MAX_TOTAL_ATTACHMENT_BYTES, validateAttachmentEntries } from "@/lib/mail/attachment-validation";
 import { composeAttachmentBucket } from "@/lib/scheduling/constants";
@@ -359,6 +360,8 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
   const attachmentBytes = forwardedAttachments.reduce((sum, attachment) => sum + attachment.sizeBytes, 0) + files.reduce((sum, file) => sum + file.size, 0);
   const previewBody = appendDriveLinkSection(body || "Your message will appear here.", driveFiles.filter((item) => item.driveFileId).map((item) => ({ id: item.driveFileId!, name: item.file.name, url: `https://drive.google.com/file/d/${encodeURIComponent(item.driveFileId!)}/view` })));
   const senderLockedByDriveUpload = driveFiles.some((item) => item.sessionUrl || item.driveFileId);
+  const reconnectDisabled = status === "sending" || status === "scheduling";
+  const reconnectClassName = "inline-flex items-center gap-2 rounded-full border border-fuchsia-300/35 bg-[#101828] px-5 py-3 text-sm font-semibold text-fuchsia-200 transition hover:border-fuchsia-200/60 hover:bg-[#172033]";
 
   return <form ref={formRef} onSubmit={submit} className="glass min-w-0 rounded-3xl p-5 sm:p-8">
     {draft?.providerThreadId && <input type="hidden" name="providerThreadId" value={draft.providerThreadId} />}
@@ -438,6 +441,12 @@ export function ComposeForm({ identities, projects = [], initialProjectId = "", 
       <p className="mt-3 text-sm font-semibold text-[#67E8F9]">{schedulePreview}</p><p className="mt-1 text-xs text-[#93A0B5]">Timezone: {timezone}</p>
       <button type="button" onClick={() => void schedule()} disabled={status === "scheduling" || !identities.length || !from} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#0E1C33] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60 sm:w-auto"><CalendarClock className="size-4" /> {status === "scheduling" ? attachmentCount ? "Uploading & scheduling…" : "Scheduling…" : "Confirm schedule"}</button>
     </section>}
-    <div className="mt-7 flex flex-wrap justify-end gap-3"><button type="button" onClick={() => setScheduleOpen((current) => !current)} disabled={status === "sending" || status === "scheduling" || !identities.length || !from} className="inline-flex items-center gap-2 rounded-full border border-[#22D3EE] bg-[#101828] px-6 py-3 text-sm font-semibold text-[#67E8F9] disabled:opacity-60"><CalendarClock className="size-4" /> Schedule send</button><button type="submit" disabled={status === "sending" || status === "scheduling" || !identities.length || !from} className="inline-flex items-center gap-2 rounded-full kym-action px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(37,99,235,.22)] transition  disabled:cursor-not-allowed disabled:opacity-60"><Send className="size-4" /> {status === "sending" ? attachmentCount ? "Uploading & sending…" : "Sending…" : draft?.mode === "reply" ? "Send reply" : draft?.mode === "forward" ? "Forward now" : "Send now"}</button></div>
+    <div className="mt-7 flex flex-wrap justify-end gap-3">
+      {reconnectDisabled
+        ? <span aria-disabled="true" className={`${reconnectClassName} cursor-not-allowed opacity-50`}><RefreshCw className="size-4" /> Reconnect Google Mail</span>
+        : <Link href="/api/oauth/google/start" className={reconnectClassName}><RefreshCw className="size-4" /> Reconnect Google Mail</Link>}
+      <button type="button" onClick={() => setScheduleOpen((current) => !current)} disabled={status === "sending" || status === "scheduling" || !identities.length || !from} className="inline-flex items-center gap-2 rounded-full border border-[#22D3EE] bg-[#101828] px-6 py-3 text-sm font-semibold text-[#67E8F9] disabled:opacity-60"><CalendarClock className="size-4" /> Schedule send</button>
+      <button type="submit" disabled={status === "sending" || status === "scheduling" || !identities.length || !from} className="inline-flex items-center gap-2 rounded-full kym-action px-6 py-3 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(37,99,235,.22)] transition  disabled:cursor-not-allowed disabled:opacity-60"><Send className="size-4" /> {status === "sending" ? attachmentCount ? "Uploading & sending…" : "Sending…" : draft?.mode === "reply" ? "Send reply" : draft?.mode === "forward" ? "Forward now" : "Send now"}</button>
+    </div>
   </form>;
 }
