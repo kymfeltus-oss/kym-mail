@@ -8,8 +8,8 @@ import { MAX_ATTACHMENT_COUNT, validateAttachmentEntries, validateAttachmentFile
 import { validateComposeInput } from "@/lib/mail/compose-validation";
 import { loadForwardedAttachments, parseForwardAttachmentIds } from "@/lib/mail/forwarded-attachments";
 import { defaultEmailLookForSender, isEmailLook, pixelPerfectAccessibleText } from "@/lib/mail/professional-html";
-import { emailDesignFilename, emailDesignImageMaxBytes, validPngFile } from "@/lib/mail/email-design-constants";
-import { createEmailDesignShare, hasPngSignature, removeEmailDesignShareByHash, type EmailDesignShare } from "@/lib/mail/email-design-share";
+import { emailDesignFilename, emailDesignImageMaxBytes } from "@/lib/mail/email-design-constants";
+import { createEmailDesignShare, hasPngSignature, removeEmailDesignShareByHash, type EmailDesignShare, validPngFile } from "@/lib/mail/email-design-share";
 import { requireScheduledIdentity, resolveScheduledProject } from "@/lib/scheduling/access";
 import { composeAttachmentBucket, scheduledAttachmentBucket, scheduledRfcMessageId } from "@/lib/scheduling/constants";
 import { validateScheduleTiming } from "@/lib/scheduling/validation";

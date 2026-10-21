@@ -6,8 +6,8 @@ import { MAX_ATTACHMENT_COUNT, validateAttachmentEntries, validateAttachmentFile
 import { validateComposeInput } from "@/lib/mail/compose-validation";
 import { loadInlineEmailLogo } from "@/lib/mail/inline-email-assets";
 import { buildPixelPerfectEmailHtml, buildProfessionalEmailHtml, defaultEmailLookForSender, isEmailLook, pixelPerfectAccessibleText } from "@/lib/mail/professional-html";
-import { emailDesignContentId, emailDesignFilename, validPngFile } from "@/lib/mail/email-design-constants";
-import { createEmailDesignShare, hasPngSignature, removeEmailDesignShareByHash, type EmailDesignShare } from "@/lib/mail/email-design-share";
+import { emailDesignContentId, emailDesignFilename } from "@/lib/mail/email-design-constants";
+import { createEmailDesignShare, hasPngSignature, removeEmailDesignShareByHash, type EmailDesignShare, validPngFile } from "@/lib/mail/email-design-share";
 import { loadForwardedAttachments, parseForwardAttachmentIds } from "@/lib/mail/forwarded-attachments";
 import { loadGoogleProvider, syncGmailMessageById } from "@/lib/mail/gmail-sync";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
