@@ -15,7 +15,6 @@ import { composeAttachmentBucket, scheduledAttachmentBucket, scheduledRfcMessage
 import { validateScheduleTiming } from "@/lib/scheduling/validation";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { loadStagedAttachments, parseStagedAttachmentRefs } from "@/lib/mail/staged-attachments";
-import { defaultEmailLookForSender, isEmailLook } from "@/lib/mail/professional-html";
 import { appendDriveLinkSection, parseDriveFileIds, shareDriveFilesForEmail } from "@/lib/mail/drive-link-attachments";
 import { loadGoogleProvider } from "@/lib/mail/gmail-sync";
 
