@@ -67,23 +67,23 @@ function sendDriveChunk(sessionUrl: string, file: File, start: number, end: numb
   });
 }
 
-function queryDriveUpload(sessionUrl: string, file: File) {
-  return new Promise<{ offset: number; fileId?: string }>((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("PUT", sessionUrl);
-    xhr.setRequestHeader("Content-Range", `bytes */${file.size}`);
-    xhr.onload = () => {
-      if (xhr.status === 308) { resolve({ offset: resumableOffset(xhr) }); return; }
-      if (xhr.status === 200 || xhr.status === 201) {
-        try { resolve({ offset: file.size, fileId: (JSON.parse(xhr.responseText) as { id?: string }).id }); }
-        catch { reject(new Error("Google Drive could not confirm the completed upload.")); }
-        return;
-      }
-      reject(new Error("Google Drive could not resume this upload. Remove the file and select it again."));
-    };
-    xhr.onerror = () => reject(new Error("Could not check the Drive upload progress. Retry when your connection is available."));
-    xhr.send();
-  });
+async function queryDriveUpload(sessionUrl: string, file: File) {
+  let response: Response;
+  try {
+    response = await fetch("/api/mail/drive-uploads/progress", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sessionUrl, size: file.size })
+    });
+  } catch {
+    throw new Error("Could not check the Drive upload progress. Retry when your connection is available.");
+  }
+  const payload = await readApiJson<{ error?: string; offset?: number; fileId?: string; expired?: boolean }>(response);
+  if (payload.expired) throw new Error(payload.error || "This Google Drive upload session expired. Remove the file and select it again to restart.");
+  if (!response.ok || typeof payload.offset !== "number") {
+    throw new Error(payload.error || "Could not check the Drive upload progress. Retry when your connection is available.");
+  }
+  return { offset: payload.offset, fileId: payload.fileId };
 }
 
 async function uploadFileToDrive(sessionUrl: string, file: File, initialOffset: number, onProgress: (uploaded: number) => void) {
